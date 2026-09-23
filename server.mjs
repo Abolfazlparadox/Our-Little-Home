@@ -9,6 +9,8 @@ const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
 const rooms = new Map();
 const SESSION_TTL = 10 * 60 * 1000;
+const INTERACTION_ACTIONS = new Set(['talk', 'hug', 'kiss', 'hold', 'cuddle', 'sitTogether', 'teaTogether', 'gift', 'tease', 'highfive', 'dance']);
+const ACTIVITY_ACTIONS = new Set(['cook', 'tea', 'clean', 'decorate', 'movie', 'shop', 'picnic', 'photo', 'dance']);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -39,15 +41,24 @@ function sessionToken() {
   return crypto.randomBytes(18).toString('base64url');
 }
 
+function finiteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function safeHex(value, fallback) {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+}
+
 function sanitizeCharacter(character = {}) {
   return {
     name: typeof character.name === 'string' ? character.name.slice(0, 24) : '',
-    skin: typeof character.skin === 'string' ? character.skin.slice(0, 16) : '#c58b70',
-    hair: typeof character.hair === 'string' ? character.hair.slice(0, 16) : '#171516',
+    skin: safeHex(character.skin, '#c58b70'),
+    hair: safeHex(character.hair, '#171516'),
     hairStyle: typeof character.hairStyle === 'string' ? character.hairStyle.slice(0, 16) : 'short',
     outfit: typeof character.outfit === 'string' ? character.outfit.slice(0, 16) : 'linen',
-    eye: typeof character.eye === 'string' ? character.eye.slice(0, 16) : '#3b2925',
-    eyeColor: typeof character.eyeColor === 'string' ? character.eyeColor.slice(0, 16) : (typeof character.eye === 'string' ? character.eye.slice(0, 16) : '#3b2925'),
+    eye: safeHex(character.eye, '#3b2925'),
+    eyeColor: safeHex(character.eyeColor, safeHex(character.eye, '#3b2925')),
     faceShape: typeof character.faceShape === 'string' ? character.faceShape.slice(0, 16) : 'soft',
     bodyBuild: typeof character.bodyBuild === 'string' ? character.bodyBuild.slice(0, 16) : 'natural',
     height: typeof character.height === 'string' ? character.height.slice(0, 16) : 'average',
@@ -57,16 +68,50 @@ function sanitizeCharacter(character = {}) {
 }
 
 function sanitizeSharedState(raw = {}) {
-  const allowed = ['day', 'minutes', 'weather', 'wallet', 'characters', 'stats', 'inventory', 'decorations', 'tasks', 'memories'];
+  const allowed = ['day', 'minutes', 'weather', 'wallet', 'characters', 'stats', 'inventory', 'decorations', 'furniture', 'tasks', 'memories'];
   const result = {};
   allowed.forEach((key) => { if (raw[key] !== undefined) result[key] = raw[key]; });
+  if (result.day !== undefined) result.day = Math.max(1, Math.min(9999, Math.round(finiteNumber(result.day, 1))));
+  if (result.minutes !== undefined) result.minutes = Math.max(0, Math.min(1439.99, finiteNumber(result.minutes, 0)));
+  if (result.weather !== undefined && result.weather !== 'rain' && result.weather !== 'clear') result.weather = 'clear';
+  if (result.wallet !== undefined) result.wallet = Math.max(0, Math.min(999999999, finiteNumber(result.wallet, 0)));
+  if (result.stats && typeof result.stats === 'object') {
+    const statKeys = ['relationship', 'happiness', 'energy', 'hunger', 'hygiene', 'trust', 'comfort', 'stress'];
+    result.stats = Object.fromEntries(statKeys.filter((key) => result.stats[key] !== undefined).map((key) => [key, Math.max(0, Math.min(100, finiteNumber(result.stats[key], 0)))]));
+  }
+  if (result.inventory && typeof result.inventory === 'object') {
+    const inventoryKeys = ['tea', 'egg', 'rice', 'pasta', 'preparedFood'];
+    result.inventory = Object.fromEntries(inventoryKeys.filter((key) => result.inventory[key] !== undefined).map((key) => [key, Math.max(0, Math.min(999, Math.floor(finiteNumber(result.inventory[key], 0))))]));
+  }
+  if (result.decorations && typeof result.decorations === 'object') {
+    result.decorations = Object.fromEntries(['lamp', 'plant', 'photo', 'rug'].map((key) => [key, Boolean(result.decorations[key])]));
+  }
+  if (result.tasks && typeof result.tasks === 'object') {
+    result.tasks = Object.fromEntries(['greet', 'cook', 'outside', 'date', 'decorate'].map((key) => [key, Boolean(result.tasks[key])]));
+  }
   if (result.characters) {
     result.characters = {
       abolfazl: sanitizeCharacter(result.characters.abolfazl),
       razieh: sanitizeCharacter(result.characters.razieh),
     };
   }
-  if (result.memories && Array.isArray(result.memories)) result.memories = result.memories.slice(0, 80);
+  if (result.furniture && typeof result.furniture === 'object') {
+    const clampFurniture = (item, fallback) => ({
+      x: Math.max(-14, Math.min(14, finiteNumber(item?.x, fallback.x))),
+      z: Math.max(-8, Math.min(12, finiteNumber(item?.z, fallback.z))),
+      rotation: finiteNumber(item?.rotation, fallback.rotation),
+    });
+    const defaults = { sofa: { x: -6.1, z: -1.65, rotation: 0 }, table: { x: -5.5, z: .8, rotation: 0 }, bed: { x: 7.2, z: 1.7, rotation: 0 } };
+    result.furniture = Object.fromEntries(Object.keys(defaults).filter((key) => result.furniture[key] !== undefined).map((key) => [key, clampFurniture(result.furniture[key], defaults[key])]));
+  }
+  if (result.memories && Array.isArray(result.memories)) {
+    result.memories = result.memories.slice(0, 80).map((memory) => ({
+      key: typeof memory?.key === 'string' ? memory.key.slice(0, 40) : undefined,
+      icon: typeof memory?.icon === 'string' ? memory.icon.slice(0, 8) : '✦',
+      title: typeof memory?.title === 'string' ? memory.title.slice(0, 80) : 'خاطره‌ی تازه',
+      detail: typeof memory?.detail === 'string' ? memory.detail.slice(0, 120) : '',
+    }));
+  }
   return result;
 }
 
@@ -75,7 +120,7 @@ function mergeSharedState(room, patch = {}) {
   Object.entries(safe).forEach(([key, value]) => {
     if (key === 'characters' && value && typeof value === 'object') {
       room.sharedState.characters = { ...(room.sharedState.characters || {}), ...value };
-    } else if (key === 'stats' || key === 'inventory' || key === 'decorations' || key === 'tasks') {
+    } else if (key === 'stats' || key === 'inventory' || key === 'decorations' || key === 'furniture' || key === 'tasks') {
       room.sharedState[key] = { ...(room.sharedState[key] || {}), ...(value || {}) };
     } else {
       room.sharedState[key] = value;
@@ -210,6 +255,8 @@ function reconnectClient(room, player, client, character) {
 }
 
 function leaveClient(client, permanent = false) {
+  if (client.closed) return;
+  client.closed = true;
   const room = client.roomCode ? rooms.get(client.roomCode) : null;
   const player = client.player;
   if (!room || !player) return;
@@ -249,11 +296,11 @@ function handleMessage(client, message) {
   player.lastSeen = Date.now();
   if (message.type === 'playerState') {
     player.lastState = {
-      position: { x: Number(message.state?.position?.x || 0), y: Number(message.state?.position?.y || 0), z: Number(message.state?.position?.z || 0) },
-      rotation: { yaw: Number(message.state?.rotation?.yaw || 0), pitch: Number(message.state?.rotation?.pitch || 0) },
+      position: { x: finiteNumber(message.state?.position?.x, 0), y: finiteNumber(message.state?.position?.y, 0), z: finiteNumber(message.state?.position?.z, 0) },
+      rotation: { yaw: finiteNumber(message.state?.rotation?.yaw, 0), pitch: finiteNumber(message.state?.rotation?.pitch, 0) },
       animation: String(message.state?.animation || 'idle').slice(0, 24),
       interaction: message.state?.interaction ? String(message.state.interaction).slice(0, 32) : null,
-      car: message.state?.car ? { mode: Boolean(message.state.car.mode), x: Number(message.state.car.x || 0), z: Number(message.state.car.z || 0), heading: Number(message.state.car.heading || 0) } : null,
+      car: message.state?.car ? { mode: Boolean(message.state.car.mode), x: finiteNumber(message.state.car.x, 0), z: finiteNumber(message.state.car.z, 0), heading: finiteNumber(message.state.car.heading, 0) } : null,
       at: Date.now(),
     };
     player.character = sanitizeCharacter(message.character || player.character);
@@ -268,6 +315,7 @@ function handleMessage(client, message) {
     const target = room.players.get(targetId);
     if (!target || !target.connected) { sendError(client.socket, 'targetUnavailable', 'همراه شما در دسترس نیست.'); return; }
     const action = String(message.action || '').slice(0, 24);
+    if (!INTERACTION_ACTIONS.has(action)) { sendError(client.socket, 'invalidInteraction', 'این تعامل در خانه فعال نیست.'); return; }
     const a = player.lastState?.position; const b = target.lastState?.position;
     if (a && b && Math.hypot((a.x || 0) - (b.x || 0), (a.z || 0) - (b.z || 0)) > 4.5) { sendError(client.socket, 'tooFar', 'برای این تعامل کمی نزدیک‌تر بایستید.'); return; }
     broadcast(room, { type: 'interaction', eventId: randomId(10), action, initiatorId: player.clientId, targetId, initiatorRole: player.role, targetRole: target.role, at: Date.now() });
@@ -276,6 +324,7 @@ function handleMessage(client, message) {
     broadcast(room, { type: 'sharedState', sharedState: room.sharedState });
   } else if (message.type === 'activity') {
     const action = String(message.action || '').slice(0, 24);
+    if (!ACTIVITY_ACTIONS.has(action)) { sendError(client.socket, 'invalidActivity', 'این فعالیت در خانه فعال نیست.'); return; }
     const status = message.status === 'end' ? 'end' : 'start';
     broadcast(room, { type: 'activity', action, status, initiatorId: player.clientId, role: player.role, at: Date.now() });
   } else if (message.type === 'vehicleRequest') {
@@ -293,10 +342,10 @@ function handleMessage(client, message) {
     }
   } else if (message.type === 'vehicleUpdate') {
     if (room.vehicle.driverId !== player.clientId) return;
-    room.vehicle.x = Math.max(-14, Math.min(14, Number(message.vehicle?.x || room.vehicle.x)));
-    room.vehicle.z = Math.max(14.3, Math.min(24.1, Number(message.vehicle?.z || room.vehicle.z)));
-    room.vehicle.heading = Number(message.vehicle?.heading || room.vehicle.heading);
-    room.vehicle.speed = Number(message.vehicle?.speed || 0);
+    room.vehicle.x = Math.max(-14, Math.min(14, finiteNumber(message.vehicle?.x, room.vehicle.x)));
+    room.vehicle.z = Math.max(14.3, Math.min(24.1, finiteNumber(message.vehicle?.z, room.vehicle.z)));
+    room.vehicle.heading = finiteNumber(message.vehicle?.heading, room.vehicle.heading);
+    room.vehicle.speed = Math.max(-3.5, Math.min(7.4, finiteNumber(message.vehicle?.speed, 0)));
     broadcast(room, { type: 'vehicleState', vehicle: room.vehicle }, player.clientId);
   } else if (message.type === 'chat') {
     const text = String(message.text || '').trim().slice(0, 120);
@@ -309,7 +358,7 @@ function handleMessage(client, message) {
 }
 
 function createClient(socket) {
-  return { socket, clientId: randomId(12), roomCode: null, player: null, buffer: Buffer.alloc(0) };
+  return { socket, clientId: randomId(12), roomCode: null, player: null, buffer: Buffer.alloc(0), closed: false };
 }
 
 function consumeFrames(client, chunk) {
@@ -361,6 +410,7 @@ server.on('upgrade', (req, socket) => {
   const client = createClient(socket);
   socket.on('data', (chunk) => consumeFrames(client, chunk));
   socket.on('error', () => leaveClient(client));
+  socket.on('end', () => { leaveClient(client); socket.destroy(); });
   socket.on('close', () => leaveClient(client));
 });
 

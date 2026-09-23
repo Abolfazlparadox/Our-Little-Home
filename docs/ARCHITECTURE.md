@@ -28,7 +28,7 @@ index.html / styles.css
 
 - **Local player state**: camera yaw/pitch, input keys, local movement velocity, local interaction lock, local UI panels, local audio, local save position.
 - **Remote player state**: last server broadcast transform, role, character appearance, animation, interaction, seat, and interpolation target.
-- **Shared world state**: day/time/weather, wallet, inventory, relationship stats, memories, tasks, decorations, character appearance.
+- **Shared world state**: day/time/weather, wallet, inventory, relationship stats, memories, tasks, decorations, furniture transforms, character appearance.
 - **Server authority**: room slots, role assignment, session/reconnect tokens, interaction target existence/proximity, vehicle seat assignment and vehicle movement relay.
 
 ## Message protocol
@@ -41,7 +41,7 @@ Client to server:
 - `characterUpdate`: update the sender's appearance and shared character record.
 - `interaction`: request an interaction with the other room client.
 - `activity`: start/end a visible cooperative activity such as cooking.
-- `sharedPatch`: send authoritative-looking shared slice changes from the prototype client.
+- `sharedPatch`: send shared slice changes from the prototype client; the server allowlists and clamps state, including furniture layout.
 - `vehicleRequest` / `vehicleUpdate`: claim/release a seat and update driver movement.
 - `chat`: send a bounded quick phrase.
 
@@ -66,7 +66,8 @@ Server to client:
 4. Server broadcasts one event to both clients.
 5. Each client aligns the remote avatar to the local player anchor, locks local movement, sets the same action timer, animates articulated limbs, and restores movement.
 6. Only the initiator applies shared relationship/memory/wallet effects to avoid double counting, then sends a shared patch.
-7. Offline mode uses the same contextual actions with the AI companion and local state.
+7. Furniture edits use the same shared-state boundary; the server clamps sofa/table/bed positions and rotation before rebroadcasting.
+8. Offline mode uses the same contextual actions with the AI companion and local state.
 
 ## Replacing the procedural avatar
 

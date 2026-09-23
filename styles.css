@@ -353,3 +353,11 @@ img { max-width: 100%; display: block; }
 /* More capable but still light-weight avatar animation cues. */
 .avatar-nameplate { position: absolute; pointer-events: none; padding: 4px 7px; border-radius: 7px; background: rgba(14,25,21,.75); color: var(--cream); font-size: 8px; }
 @media (max-width: 760px) { .multiplayer-card { padding: 21px; }.network-pill { display: none; }.mp-header h2 { font-size: 25px; }.mp-role-row { gap: 5px; }.quick-chat-card { padding: 19px; }.quick-chat-list { grid-template-columns: 1fr 1fr; } }
+.furniture-controls { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.furniture-controls h4 { margin: 0 0 9px; font-size: 10px; color: var(--muted); }
+.furniture-control-row { display: flex; align-items: center; gap: 7px; padding: 8px 0; border-bottom: 1px solid rgba(241,231,215,.06); }
+.furniture-control-row:last-child { border-bottom: 0; }
+.furniture-control-row b { min-width: 66px; font-size: 9px; }
+.furniture-control-row button { width: 29px; height: 27px; border-radius: 7px; border: 1px solid var(--line); background: rgba(255,255,255,.05); color: var(--gold); font-size: 11px; }
+.furniture-control-row button:hover { border-color: rgba(230,189,120,.5); background: rgba(230,189,120,.12); }
+@media (max-width: 760px) { .furniture-control-row b { min-width: 54px; } }

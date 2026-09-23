@@ -93,8 +93,9 @@ class RawWebSocketClient {
   close() { this.socket?.destroy(); }
 }
 
-const abolfazl = await new RawWebSocketClient('abolfazl').connect();
+let abolfazl = await new RawWebSocketClient('abolfazl').connect();
 const razieh = await new RawWebSocketClient('razieh').connect();
+let reconnect = null;
 try {
   abolfazl.send({ type: 'createRoom', role: 'abolfazl', character: { name: 'ابوالفضل' }, sharedState: { wallet: 100 } });
   const created = await abolfazl.waitFor((message) => message.type === 'roomCreated');
@@ -104,6 +105,10 @@ try {
   const joined = await razieh.waitFor((message) => message.type === 'roomJoined');
   assert.equal(joined.players.length, 2);
   await abolfazl.waitFor((message) => message.type === 'presence' && message.players.length === 2);
+
+  abolfazl.send({ type: 'sharedPatch', patch: { furniture: { sofa: { x: -4.2, z: -1.1, rotation: 0.5 } } } });
+  const shared = await razieh.waitFor((message) => message.type === 'sharedState' && message.sharedState.furniture?.sofa?.x === -4.2);
+  assert.equal(shared.sharedState.furniture.sofa.z, -1.1);
 
   const nearState = (x) => ({ position: { x, y: 1.62, z: 0 }, rotation: { yaw: 0, pitch: 0 }, animation: 'idle', car: { mode: false } });
   abolfazl.send({ type: 'playerState', state: nearState(0), character: { name: 'ابوالفضل' } });
@@ -119,7 +124,15 @@ try {
   const vehicle = await razieh.waitFor((message) => message.type === 'vehicleState');
   assert.equal(vehicle.vehicle.driverId, created.clientId);
 
+  abolfazl.close();
+  await razieh.waitFor((message) => message.type === 'presence' && message.players.some((player) => player.clientId === created.clientId && !player.connected));
+  reconnect = await new RawWebSocketClient('reconnect').connect();
+  reconnect.send({ type: 'joinRoom', roomCode: created.roomCode, role: 'abolfazl', sessionToken: created.sessionToken, character: { name: 'ابوالفضل' } });
+  const reconnected = await reconnect.waitFor((message) => message.type === 'reconnected');
+  assert.equal(reconnected.clientId, created.clientId);
+  await razieh.waitFor((message) => message.type === 'presence' && message.players.some((player) => player.clientId === created.clientId && player.connected));
+
   console.log('multiplayer smoke passed:', created.roomCode);
 } finally {
-  abolfazl.close(); razieh.close();
+  abolfazl.close(); razieh.close(); reconnect?.close();
 }

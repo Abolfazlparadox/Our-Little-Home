@@ -35,7 +35,7 @@ Three.js is vendored in `assets/three.module.js`; the playable scene does not re
 - Server broadcasts player position, rotation, animation state, clothing appearance, quick chat, synchronized interactions, shared state, and driver/passenger vehicle state.
 - Remote movement is interpolated instead of snapping. The remote character is a full-body articulated procedural humanoid with shoulders, torso, arms, hands, pelvis, legs, feet, hair, face planes, accessories, and lightweight idle/walk/run/couple animation cues.
 - Synchronized hug, kiss, hold-hands, dance, high-five, talk, gift, and cooking activity events. Both clients lock local movement during affection alignment and receive the same remote animation event.
-- Shared wallet, inventory, decorations, objectives, memories, customization, day/time, relationship state, quick phrases, and local save data.
+- Shared wallet, inventory, decorations, furniture layout (sofa, table, bed), objectives, memories, customization, day/time, relationship state, quick phrases, and local save data. Furniture movement/rotation is clamped and broadcast to both players.
 - Driver/passenger seat assignment. The first player to enter the shared car becomes driver, the other becomes passenger; vehicle movement is broadcast through the room.
 - Offline mode remains available when the WebSocket server is not reachable. Offline mode uses the existing AI companion and localStorage save flow without claiming to be multiplayer.
 
@@ -91,7 +91,7 @@ With the server running in another terminal, run the two-client raw WebSocket sm
 npm run smoke
 ```
 
-The smoke test creates a room, joins the second role, checks presence and remote state, broadcasts a hug interaction, and verifies driver assignment.
+The smoke test creates a room, joins the second role, checks presence and remote state, synchronizes a furniture patch, broadcasts a hug interaction, verifies driver assignment, and exercises reconnect with the session token.
 
 ## Persistence
 
@@ -120,5 +120,5 @@ This workspace contains the complete source and a local Git-ready project, inclu
 - The humanoids are procedural and articulated rather than imported GLB skeletal assets. The architecture is ready for replacing `makeAvatar()` with optimized local GLB rigs and an `AnimationMixer` without changing multiplayer messages.
 - Shared room state is memory-backed on the server; durable multiplayer persistence needs Redis/Postgres/Supabase or another production store.
 - Vehicle movement is synchronized for the compact prototype, but detailed door/seat/steering animations are next.
-- Cooking, dates, and decoration are functional vertical-slice activities; a larger content pass can add shopping carts, cleaning zones, picnic placement, furniture transform mode, weather/rain, and richer spatial audio.
+- Cooking, dates, and decoration are functional vertical-slice activities; a larger content pass can add shopping carts, cleaning zones, picnic placement, weather/rain, and richer spatial audio.
 - Browser voice chat is not enabled. Quick Persian chat is live and the WebRTC insertion point is the room transport layer.

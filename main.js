@@ -2,6 +2,7 @@ import * as THREE from './assets/three.module.js';
 
 const STORAGE_KEY = 'our-little-home-save-v1';
 const NETWORK_SESSION_KEY = 'our-little-home-network-session-v1';
+const SOUND_KEY = 'our-little-home-sound-v1';
 const fa = (value) => Number(value || 0).toLocaleString('fa-IR');
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const $ = (selector) => document.querySelector(selector);
@@ -90,6 +91,11 @@ function createDefaultState() {
     stats: { relationship: 78, happiness: 72, energy: 82, hunger: 67, hygiene: 86, trust: 84, comfort: 64, stress: 17 },
     inventory: { tea: 4, egg: 2, rice: 1, pasta: 1, preparedFood: 0 },
     decorations: { lamp: false, plant: false, photo: true, rug: false },
+    furniture: {
+      sofa: { x: -6.1, z: -1.65, rotation: 0 },
+      table: { x: -5.5, z: .8, rotation: 0 },
+      bed: { x: 7.2, z: 1.7, rotation: 0 },
+    },
     tasks: { greet: false, cook: false, outside: false, date: false, decorate: false },
     memories: [
       { icon: '☾', title: 'اولین شب در خانه‌ی ما', detail: 'روز اول · چراغ‌های کوچک روشن شدند' },
@@ -112,6 +118,11 @@ function normaliseState(raw) {
     stats: { ...base.stats, ...(raw.stats || {}) },
     inventory: { ...base.inventory, ...(raw.inventory || {}) },
     decorations: { ...base.decorations, ...(raw.decorations || {}) },
+    furniture: {
+      sofa: { ...base.furniture.sofa, ...((raw.furniture && raw.furniture.sofa) || {}) },
+      table: { ...base.furniture.table, ...((raw.furniture && raw.furniture.table) || {}) },
+      bed: { ...base.furniture.bed, ...((raw.furniture && raw.furniture.bed) || {}) },
+    },
     tasks: { ...base.tasks, ...(raw.tasks || {}) },
     memories: Array.isArray(raw.memories) ? raw.memories : base.memories,
     playerPosition: { ...base.playerPosition, ...(raw.playerPosition || {}) },
@@ -150,6 +161,8 @@ const runtime = {
   modalAvatar: null,
   worldGroup: null,
   decorationGroup: null,
+  furnitureGroups: new Map(),
+  furnitureColliders: new Map(),
   partner: null,
   partnerRole: 'razieh',
   partnerTarget: null,
@@ -215,7 +228,13 @@ const runtime = {
   introShown: false,
   worldNeedsReset: false,
   timeBucket: '',
+  soundEnabled: true,
 };
+
+try {
+  const savedSound = localStorage.getItem(SOUND_KEY);
+  if (savedSound !== null) runtime.soundEnabled = savedSound !== '0';
+} catch (_) { /* sound preference is optional */ }
 
 try {
   const savedNetworkSession = sessionStorage.getItem(NETWORK_SESSION_KEY);
@@ -371,18 +390,25 @@ function showStartNotice(message) {
   setTimeout(() => { note.textContent = old; note.style.color = ''; }, 2600);
 }
 
+function setSoundEnabled(enabled) {
+  runtime.soundEnabled = Boolean(enabled);
+  try { localStorage.setItem(SOUND_KEY, runtime.soundEnabled ? '1' : '0'); } catch (_) { /* preference is optional */ }
+}
+
 function openStartSettings() {
   const existing = $('#start-settings-modal');
   if (existing) existing.remove();
   const panel = document.createElement('div');
   panel.id = 'start-settings-modal';
   panel.className = 'start-settings-modal';
-  panel.innerHTML = `<div class="start-settings-card"><button class="close-btn" data-close-start-settings>×</button><span class="eyebrow">تنظیمات آرام</span><h3>خانه‌ی ما</h3><p>این نسخه یک تجربه‌ی آفلاین و تک‌مرورگری است؛ پیشرفت شما در همین دستگاه ذخیره می‌شود.</p><div class="settings-row"><span>زبان رابط</span><b>فارسی · راست‌چین</b></div><div class="settings-row"><span>کنترل پیشنهادی</span><b>WASD + ماوس</b></div><div class="settings-row"><span>صدا</span><button class="settings-toggle active" data-toggle-sound>روشن</button></div><button class="secondary-btn full" data-close-start-settings>متوجه شدم</button></div>`;
+  panel.innerHTML = `<div class="start-settings-card"><button class="close-btn" data-close-start-settings>×</button><span class="eyebrow">تنظیمات آرام</span><h3>خانه‌ی ما</h3><p>بازی از اول شخص و موبایل پشتیبانی می‌کند؛ اتاق دونفره از منوی «شروع زندگی» ساخته می‌شود و پیشرفت روی همین دستگاه هم ذخیره می‌ماند.</p><div class="settings-row"><span>زبان رابط</span><b>فارسی · راست‌چین</b></div><div class="settings-row"><span>کنترل پیشنهادی</span><b>WASD + ماوس</b></div><div class="settings-row"><span>صدا</span><button class="settings-toggle ${runtime.soundEnabled ? 'active' : ''}" data-toggle-sound>${runtime.soundEnabled ? 'روشن' : 'خاموش'}</button></div><button class="secondary-btn full" data-close-start-settings>متوجه شدم</button></div>`;
   $('#start-screen').appendChild(panel);
   panel.querySelectorAll('[data-close-start-settings]').forEach((button) => button.addEventListener('click', () => panel.remove()));
   panel.querySelector('[data-toggle-sound]').addEventListener('click', (event) => {
-    event.currentTarget.classList.toggle('active');
-    event.currentTarget.textContent = event.currentTarget.classList.contains('active') ? 'روشن' : 'خاموش';
+    const enabled = !runtime.soundEnabled;
+    setSoundEnabled(enabled);
+    event.currentTarget.classList.toggle('active', enabled);
+    event.currentTarget.textContent = enabled ? 'روشن' : 'خاموش';
   });
 }
 
@@ -511,6 +537,7 @@ function serializeSharedState() {
     stats: state.stats,
     inventory: state.inventory,
     decorations: state.decorations,
+    furniture: state.furniture,
     tasks: state.tasks,
     memories: state.memories,
   };
@@ -522,6 +549,7 @@ function applySharedState(shared) {
   state = normaliseState({ ...state, ...shared, playerPosition: currentPosition });
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); savedStateExists = true; updateContinueButton(); } catch (_) { /* local persistence is optional */ }
   if (runtime.gameReady) {
+    applyFurnitureLayout();
     addDecorations();
     if (runtime.network.online) rebuildRemotePlayers();
     updateHUD(true);
@@ -732,10 +760,15 @@ function updateRemotePlayers(dt) {
 function shortestAngle(from, to) { return Math.atan2(Math.sin(to - from), Math.cos(to - from)); }
 
 function applyNetworkInteractionEffect(action) {
-  if (action === 'hug') { state.tasks.greet = true; applyDelta({ relationship: 3, happiness: 3, energy: -1, stress: -2 }); addMemoryOnce('hug', { icon: '♡', title: 'یک آغوش در خانه', detail: `روز ${fa(state.day)} · باهم` }); }
+  if (action === 'talk') { state.tasks.greet = true; applyDelta({ relationship: 1, happiness: 1, stress: -1 }); }
+  else if (action === 'hug') { state.tasks.greet = true; applyDelta({ relationship: 3, happiness: 3, energy: -1, stress: -2 }); addMemoryOnce('hug', { icon: '♡', title: 'یک آغوش در خانه', detail: `روز ${fa(state.day)} · باهم` }); }
   else if (action === 'kiss') { state.tasks.greet = true; applyDelta({ relationship: 2, happiness: 3, stress: -1 }); addMemoryOnce('kiss', { icon: '✦', title: 'اولین بوسه‌ی این خانه', detail: `روز ${fa(state.day)} · یک لحظه‌ی آرام` }); }
   else if (action === 'hold') { state.tasks.greet = true; applyDelta({ relationship: 2, happiness: 2 }); }
+  else if (action === 'highfive') applyDelta({ relationship: 2, happiness: 2 });
+  else if (action === 'dance') { applyDelta({ relationship: 3, happiness: 5, energy: -3 }); addMemoryOnce('dance', { icon: '♫', title: 'رقص وسط خانه', detail: 'چند ثانیه، بدون دلیل خاص' }); }
   else if (action === 'cuddle') applyDelta({ happiness: 5, relationship: 3, stress: -3 });
+  else if (action === 'sitTogether') applyDelta({ happiness: 4, relationship: 3, energy: 2 });
+  else if (action === 'teaTogether') { state.inventory.tea = Math.max(0, state.inventory.tea - 1); applyDelta({ happiness: 5, relationship: 3, energy: 2 }); addMemoryOnce('tea-together', { icon: '☕', title: 'چای دونفره', detail: 'دو فنجان، یک پنجره' }); }
   else if (action === 'tease') applyDelta({ relationship: 2, happiness: 3 });
   else if (action === 'gift') { state.wallet = Math.max(0, state.wallet - 120000); applyDelta({ relationship: 5, happiness: 4, stress: -2 }); addMemoryOnce('gift', { icon: '◇', title: 'هدیه‌ی بی‌دلیل', detail: 'چیزی کوچک برای لبخند' }); }
   syncSharedState(); updateHUD();
@@ -748,7 +781,9 @@ function handleNetworkInteraction(event) {
   if (event.action === 'talk' && event.initiatorId === runtime.network.clientId) {
     $('#dialogue-text').textContent = DIALOGUE_LINES[Math.floor(Math.random() * DIALOGUE_LINES.length)];
     $('#dialogue-modal').classList.remove('hidden'); runtime.overlayOpen = true;
-  } else if (event.action !== 'talk') {
+  } else if (event.action === 'talk') {
+    showToast('همراهتان می‌خواهد چند کلمه با شما حرف بزند.', true);
+  } else {
     showToast(event.initiatorId === runtime.network.clientId ? 'لحظه‌ی مشترک اجرا شد.' : 'همراهتان یک لحظه‌ی صمیمی را شروع کرد.', true);
   }
 }
@@ -1146,7 +1181,7 @@ function animateAvatar(avatar, animation = 'idle', time = 0) {
     avatar.position.y = Math.sin(t * 5) * .008;
   } else if (animation === 'drive' || animation === 'passenger') {
     p.leftArm.rotation.x = .25; p.rightArm.rotation.x = .25;
-  } else if (animation === 'sit') {
+  } else if (animation === 'sit' || animation === 'sitTogether' || animation === 'movie') {
     p.leftLeg.rotation.x = -.8; p.rightLeg.rotation.x = -.8; p.leftArm.rotation.x = .25; p.rightArm.rotation.x = .25;
   } else {
     p.leftArm.rotation.z = swing * .15; p.rightArm.rotation.z = -swing * .15;
@@ -1224,6 +1259,8 @@ function buildWorld() {
   scene.add(runtime.decorationGroup);
   runtime.colliders = [];
   runtime.interactables = [];
+  runtime.furnitureGroups.clear();
+  runtime.furnitureColliders.clear();
   runtime.remotePlayers.clear();
   runtime.partner = null;
   runtime.dynamicLights = [];
@@ -1303,17 +1340,56 @@ function addCityBuildings() {
   runtime.colliders.push({ x: -10.5, z: 20.3, hx: 1.1, hz: .5 });
 }
 
+function getFurnitureLayout(key, fallback) {
+  return { ...(state.furniture?.[key] || fallback) };
+}
+
+function registerFurniture(key, group, collider) {
+  group.userData.furnitureKey = key;
+  runtime.furnitureGroups.set(key, group);
+  runtime.furnitureColliders.set(key, collider);
+}
+
+function applyFurnitureLayout() {
+  runtime.furnitureGroups.forEach((group, key) => {
+    const layout = state.furniture?.[key];
+    if (!layout) return;
+    group.position.x = layout.x; group.position.z = layout.z; group.rotation.y = layout.rotation || 0;
+    const collider = runtime.furnitureColliders.get(key);
+    if (collider) { collider.x = layout.x; collider.z = layout.z; collider.rotation = layout.rotation || 0; }
+  });
+  runtime.interactables.forEach((item) => {
+    if (item.mesh?.userData?.furnitureKey) item.staticPosition.set(item.mesh.position.x, item.mesh.position.z);
+  });
+}
+
+function moveFurniture(key, delta = {}) {
+  if (!state.furniture?.[key]) return;
+  const current = state.furniture[key];
+  current.x = clamp(current.x + (delta.x || 0), -14, 14);
+  current.z = clamp(current.z + (delta.z || 0), -8, 10);
+  current.rotation = (current.rotation + (delta.rotation || 0) + Math.PI * 4) % (Math.PI * 2);
+  applyFurnitureLayout();
+  if (runtime.network.online) syncSharedState();
+  saveGame(false);
+  showToast('چیدمان خانه برای هر دو نفر به‌روز شد.', true);
+}
+
 function addFurniture() {
   // Sofa + cushions.
-  const sofa = new THREE.Group(); sofa.position.set(-6.1, 0, -1.65); runtime.worldGroup.add(sofa);
+  const sofaLayout = getFurnitureLayout('sofa', { x: -6.1, z: -1.65, rotation: 0 });
+  const sofa = new THREE.Group(); sofa.position.set(sofaLayout.x, 0, sofaLayout.z); sofa.rotation.y = sofaLayout.rotation || 0; runtime.worldGroup.add(sofa);
   meshBox(3.7, .56, 1.02, '#6b7e6b', [0, .55, 0], sofa); meshBox(3.8, 1.45, .38, '#4d6255', [0, 1.15, .3], sofa); meshBox(.32, .9, 1.1, '#526859', [-1.84, .75, 0], sofa); meshBox(.32, .9, 1.1, '#526859', [1.84, .75, 0], sofa);
   meshBox(.85, .1, .72, '#b6785e', [-.9, .9, -.08], sofa); meshBox(.85, .1, .72, '#b6785e', [.55, .9, -.08], sofa);
-  runtime.colliders.push({ x: -6.1, z: -1.65, hx: 2.1, hz: .95 });
-  registerInteractable('sofa', 'نشیمن', sofa, [-6.1, -.4], 3.4);
+  const sofaCollider = { x: sofaLayout.x, z: sofaLayout.z, hx: 2.1, hz: .95, rotation: sofaLayout.rotation || 0 };
+  runtime.colliders.push(sofaCollider); registerFurniture('sofa', sofa, sofaCollider);
+  registerInteractable('sofa', 'نشیمن', sofa, [sofaLayout.x, sofaLayout.z], 3.4);
   // Coffee table.
-  const table = new THREE.Group(); table.position.set(-5.5, 0, .8); runtime.worldGroup.add(table);
+  const tableLayout = getFurnitureLayout('table', { x: -5.5, z: .8, rotation: 0 });
+  const table = new THREE.Group(); table.position.set(tableLayout.x, 0, tableLayout.z); table.rotation.y = tableLayout.rotation || 0; runtime.worldGroup.add(table);
   meshBox(2.1, .12, 1.15, '#8c6048', [0, .73, 0], table); [[-.82,-.4],[.82,-.4],[-.82,.4],[.82,.4]].forEach(([x,z]) => meshBox(.1, .72, .1, '#5d4434', [x, .36, z], table));
-  runtime.colliders.push({ x: -5.5, z: .8, hx: 1.25, hz: .8 });
+  const tableCollider = { x: tableLayout.x, z: tableLayout.z, hx: 1.25, hz: .8, rotation: tableLayout.rotation || 0 };
+  runtime.colliders.push(tableCollider); registerFurniture('table', table, tableCollider);
   // Television wall.
   meshBox(3.6, .2, .55, '#614537', [-6.3, .45, -8.55], runtime.worldGroup); meshBox(2.45, 1.42, .08, '#121b1a', [-6.3, 2.18, -8.6], runtime.worldGroup, { roughness: .3, emissive: '#213c34', emissiveIntensity: .3 });
   const tvGlow = new THREE.PointLight(0x7da89b, .3, 5); tvGlow.position.set(-6.3, 2, -8); runtime.worldGroup.add(tvGlow); runtime.dynamicLights.push(tvGlow);
@@ -1340,10 +1416,12 @@ function addFurniture() {
   registerInteractable('kitchen', 'آشپزخانه', stove, [6.3, -6.6], 3.0);
   registerInteractable('fridge', 'یخچال', fridge, [13.2, -5.3], 2.6);
   // Bedroom bed and side tables.
-  const bed = new THREE.Group(); bed.position.set(7.2, 0, 1.7); runtime.worldGroup.add(bed);
+  const bedLayout = getFurnitureLayout('bed', { x: 7.2, z: 1.7, rotation: 0 });
+  const bed = new THREE.Group(); bed.position.set(bedLayout.x, 0, bedLayout.z); bed.rotation.y = bedLayout.rotation || 0; runtime.worldGroup.add(bed);
   meshBox(4.2, .35, 2.5, '#6b4c3c', [0, .55, 0], bed); meshBox(4.0, .32, 2.25, '#dfc9ac', [0, .78, 0], bed); meshBox(4.1, 2.1, .18, '#805a48', [0, 1.45, 1.06], bed); meshBox(1.25, .23, .72, '#bd8d7b', [-1.1, 1.0, .1], bed); meshBox(1.25, .23, .72, '#bd8d7b', [.8, 1.0, .1], bed);
-  runtime.colliders.push({ x: 7.2, z: 1.7, hx: 2.3, hz: 1.45 });
-  registerInteractable('bed', 'اتاق خواب', bed, [7.2, .2], 3.0);
+  const bedCollider = { x: bedLayout.x, z: bedLayout.z, hx: 2.3, hz: 1.45, rotation: bedLayout.rotation || 0 };
+  runtime.colliders.push(bedCollider); registerFurniture('bed', bed, bedCollider);
+  registerInteractable('bed', 'اتاق خواب', bed, [bedLayout.x, bedLayout.z], 3.0);
   // Wardrobe and mirror.
   const wardrobe = new THREE.Group(); wardrobe.position.set(13.6, 0, 2.0); runtime.worldGroup.add(wardrobe);
   meshBox(2.2, 3.5, .72, '#70503d', [0, 1.75, 0], wardrobe); meshBox(.035, 3.05, .035, '#bd9b78', [.02, 1.75, -.38], wardrobe); meshBox(.035, 3.05, .035, '#bd9b78', [-.02, 1.75, -.38], wardrobe);
@@ -1394,6 +1472,7 @@ function addCar() {
 
 function addDecorations() {
   runtime.decorationGroup.clear();
+  runtime.dynamicLights = runtime.dynamicLights.filter((light) => light.parent);
   if (state.decorations.lamp) addFloorLamp(runtime.decorationGroup, [-2.9, 0, -4.3]);
   if (state.decorations.plant) addPlant(runtime.decorationGroup, [3.7, 0, 3.5], true);
   if (state.decorations.rug) createRoundedRug(runtime.decorationGroup, [1.5, 0, 5.2], '#a16c5c', [1.1, .65, 1]);
@@ -1409,6 +1488,7 @@ function registerInteractable(id, label, mesh, position, range = 3) {
   if (id === 'partner') item.getPosition = () => runtime.partner ? runtime.partner.position : item.staticPosition;
   if (id === 'car') item.getPosition = () => runtime.car ? runtime.car.position : item.staticPosition;
   if (String(id).startsWith('remote:')) item.getPosition = () => runtime.remotePlayers.get(String(id).slice(7))?.group?.position || item.staticPosition;
+  if (mesh?.userData?.furnitureKey) item.getPosition = () => mesh.position;
   runtime.interactables.push(item);
   mesh.userData.interactable = id;
   return item;
@@ -1527,11 +1607,18 @@ function updatePlayer(dt) {
 function resolveCollisions(position) {
   const radius = .34;
   runtime.colliders.forEach((collider) => {
+    const rotation = collider.rotation || 0;
     const dx = position.x - collider.x; const dz = position.z - collider.z;
-    const overlapX = collider.hx + radius - Math.abs(dx); const overlapZ = collider.hz + radius - Math.abs(dz);
+    const cos = Math.cos(rotation); const sin = Math.sin(rotation);
+    const localX = dx * cos + dz * sin;
+    const localZ = -dx * sin + dz * cos;
+    const overlapX = collider.hx + radius - Math.abs(localX); const overlapZ = collider.hz + radius - Math.abs(localZ);
     if (overlapX > 0 && overlapZ > 0) {
-      if (overlapX < overlapZ) position.x += dx >= 0 ? overlapX : -overlapX;
-      else position.z += dz >= 0 ? overlapZ : -overlapZ;
+      let pushedX = localX; let pushedZ = localZ;
+      if (overlapX < overlapZ) pushedX += localX >= 0 ? overlapX : -overlapX;
+      else pushedZ += localZ >= 0 ? overlapZ : -overlapZ;
+      position.x = collider.x + pushedX * cos - pushedZ * sin;
+      position.z = collider.z + pushedX * sin + pushedZ * cos;
     }
   });
 }
@@ -1615,7 +1702,7 @@ function updateWorldActors(dt) {
     runtime.partnerAction.time -= dt;
     const pulse = Math.sin((2.4 - runtime.partnerAction.time) * 9) * .035;
     runtime.partner.scale.set(1 + pulse, 1 - pulse * .4, 1 + pulse);
-    if (runtime.partnerAction.time <= 0) { runtime.partnerAction = null; runtime.partner.scale.set(1, 1, 1); runtime.interactionLock = false; runtime.localAnimation = 'idle'; }
+    if (runtime.partnerAction.time <= 0) { runtime.partnerAction = null; runtime.partner.scale.set(1, 1, 1); runtime.interactionLock = false; runtime.seated = null; runtime.localAnimation = 'idle'; }
   }
 }
 
@@ -1755,6 +1842,9 @@ function actionsFor(id) {
     { id: 'hug', icon: '♡', label: 'بغل', subtitle: 'یک آغوش واقعی' },
     { id: 'kiss', icon: '✦', label: 'بوس', subtitle: 'نرم و کوتاه' },
     { id: 'hold', icon: '⌁', label: 'دست گرفتن', subtitle: 'کنار هم قدم بزنیم' },
+    { id: 'cuddle', icon: '☁', label: 'کمی نزدیک‌تر', subtitle: 'آرام کنار هم' },
+    { id: 'sitTogether', icon: '⌂', label: 'باهم بنشینیم', subtitle: 'یک توقف دونفره' },
+    { id: 'teaTogether', icon: '☕', label: 'چای دونفره', subtitle: 'یک فنجان برای هر دو' },
     { id: 'gift', icon: '◇', label: 'هدیه‌ی کوچک', subtitle: 'چیزی برای لبخند' },
     { id: 'highfive', icon: '✋', label: 'های‌فایو', subtitle: 'یک تبریک سریع' },
     { id: 'dance', icon: '♫', label: 'رقص دونفره', subtitle: 'چند ثانیه باهم' },
@@ -1807,12 +1897,13 @@ function runInteraction(targetId, action) {
   playTone('click');
   if (runtime.network.online && isPartnerTargetId(targetId)) {
     if (action === 'gift' && state.wallet < 120000) { showToast('برای هدیه‌ی کوچک، کمی پول کم دارید.', false); return; }
+    if (action === 'teaTogether' && state.inventory.tea <= 0) { showToast('چای تمام شده؛ اول کمی چای تهیه کنید.', false); return; }
     sendNetworkInteraction(targetId, action);
     return;
   }
   switch (action) {
     case 'talk':
-      state.tasks.greet = true; applyDelta({ relationship: 1, happiness: 1 });
+      state.tasks.greet = true; updatePartnerAction('talk'); applyDelta({ relationship: 1, happiness: 1, stress: -1 });
       $('#dialogue-text').textContent = DIALOGUE_LINES[Math.floor(Math.random() * DIALOGUE_LINES.length)];
       $('#dialogue-modal').classList.remove('hidden'); runtime.overlayOpen = true; playTone('dialogue'); updateHUD(); break;
     case 'hug':
@@ -1831,6 +1922,10 @@ function runInteraction(targetId, action) {
     case 'sit': startLocalSeat('sit', 3.5); applyDelta({ energy: 7, happiness: 2 }); showToast('چند دقیقه بدون عجله نشستید.', false); updateHUD(); break;
     case 'movie': startLocalSeat('sit', 5.5); applyDelta({ happiness: 6, relationship: 2, energy: -2 }); addMemoryOnce('movie', { icon: '▣', title: 'فیلم شبانه', detail: 'پایانش را باهم حدس زدیم' }); showToast('فیلم شروع شد؛ گوشی‌ها کنار.', true); updateHUD(); break;
     case 'cuddle': updatePartnerAction('cuddle'); applyDelta({ happiness: 5, relationship: 3, stress: -3 }); showToast('کنار هم، بی‌نیاز از حرف.', true); updateHUD(); break;
+    case 'sitTogether': updatePartnerAction('sitTogether'); runtime.seated = { action: 'sitTogether' }; applyDelta({ happiness: 4, relationship: 3, energy: 2 }); showToast('کنار هم نشستید؛ بقیه‌ی دنیا چند دقیقه صبر می‌کند.', true); updateHUD(); break;
+    case 'teaTogether':
+      if (state.inventory.tea <= 0) { showToast('چای تمام شده؛ اول کمی چای تهیه کنید.', false); break; }
+      state.inventory.tea -= 1; updatePartnerAction('drink'); applyDelta({ happiness: 5, relationship: 3, energy: 2 }); addMemoryOnce('tea-together', { icon: '☕', title: 'چای دونفره', detail: 'دو فنجان، یک پنجره' }); showToast('چای را کنار هم نوشیدید.', true); updateHUD(); break;
     case 'decorate': openDecorPanel(); break;
     case 'cook': openCooking(); break;
     case 'tea':
@@ -2016,6 +2111,11 @@ function renderDecorItems() {
     return `<div class="decor-item ${owned ? 'owned' : ''}"><span class="decor-icon">${item.icon}</span><div><b>${item.name}</b><small>${owned ? 'در خانه‌ی شماست' : item.detail}</small></div><button data-buy-decor="${item.id}">${owned ? '✓ مال ماست' : fa(item.price)}</button></div>`;
   }).join('');
   $('#decor-grid').querySelectorAll('[data-buy-decor]').forEach((button) => button.addEventListener('click', () => buyDecoration(button.dataset.buyDecor)));
+  const furnitureControls = $('#furniture-controls');
+  if (furnitureControls) {
+    furnitureControls.innerHTML = `<h4>چیدمان مشترک خانه</h4><div class="furniture-control-row"><b>مبل</b><button data-furniture="sofa" data-dx="0" data-dz="-.45">↑</button><button data-furniture="sofa" data-dx="0" data-dz=".45">↓</button><button data-furniture="sofa" data-rotation=".25">↻</button></div><div class="furniture-control-row"><b>میز</b><button data-furniture="table" data-dx="-.45" data-dz="0">←</button><button data-furniture="table" data-dx=".45" data-dz="0">→</button><button data-furniture="table" data-drotation="-.25">↺</button></div><div class="furniture-control-row"><b>تخت</b><button data-furniture="bed" data-dx="0" data-dz="-.45">↑</button><button data-furniture="bed" data-dx="0" data-dz=".45">↓</button><button data-furniture="bed" data-rotation=".25">↻</button></div>`;
+    furnitureControls.querySelectorAll('[data-furniture]').forEach((button) => button.addEventListener('click', () => moveFurniture(button.dataset.furniture, { x: Number(button.dataset.dx || 0), z: Number(button.dataset.dz || 0), rotation: Number(button.dataset.rotation || button.dataset.drotation || 0) })));
+  }
 }
 
 function buyDecoration(id) {
@@ -2023,7 +2123,7 @@ function buyDecoration(id) {
   const item = DECOR_ITEMS.find((decor) => decor.id === id);
   if (!item || state.wallet < item.price) { showToast('فعلاً بهتر است کمی پس‌انداز کنیم.', false); return; }
   state.wallet -= item.price; state.decorations[id] = true; state.tasks.decorate = true;
-  addDecorations(); renderDecorItems(); updateHUD(); if (runtime.network.online) syncSharedState(); showToast(`${item.name} به خانه اضافه شد.`, true); playTone('success');
+  addDecorations(); renderDecorItems(); updateHUD(); if (runtime.network.online) syncSharedState(); saveGame(false); showToast(`${item.name} به خانه اضافه شد.`, true); playTone('success');
 }
 
 function openPhone(tab = 'home') {
@@ -2108,7 +2208,7 @@ function closePause() { runtime.paused = false; $('#pause-panel').classList.add(
 
 let audioContext = null;
 function playTone(kind = 'click') {
-  if (document.hidden) return;
+  if (!runtime.soundEnabled || document.hidden) return;
   try {
     if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
     if (audioContext.state === 'suspended') audioContext.resume();
@@ -2122,7 +2222,7 @@ function playTone(kind = 'click') {
 }
 
 function playSfx(kind = 'click', pan = 0) {
-  if (document.hidden) return;
+  if (!runtime.soundEnabled || document.hidden) return;
   try {
     if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
     if (audioContext.state === 'suspended') audioContext.resume();
