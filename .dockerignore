@@ -1,0 +1,12 @@
+.git
+.gitignore
+node_modules
+.npm
+uploads
+.env
+.env.*
+!.env.example
+*.log
+coverage
+build
+dist

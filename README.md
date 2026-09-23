@@ -26,7 +26,7 @@ For the second player:
 3. Enter the room code and choose the other role.
 4. Enter the shared house.
 
-Three.js is vendored in `assets/three.module.js`; the playable scene does not require a runtime CDN. The supplied couple photo and moon image are used in the title scene, memory album, and in-world picture frames.
+Three.js is vendored in `assets/three.module.js`; the playable scene does not require a runtime CDN. The supplied couple photo and moon image are used in the title scene, memory album, and in-world picture frames. The three newly supplied couple photos are included as optimized, EXIF-stripped gallery assets in `assets/memories/` and appear in the phone and memories album.
 
 ## Current multiplayer slice
 
@@ -101,7 +101,9 @@ The smoke test creates a room, joins the second role, checks presence and remote
 
 ## Deployment
 
-The app is ready to deploy as a Node service that supports WebSocket upgrades. Use a platform with long-lived WebSocket support for `server.mjs` (a VPS, Fly.io, Railway, Render, or a comparable Node/WebSocket host). A static-only host such as a basic Pages deployment cannot run the bundled room server without an external realtime backend.
+The app is ready to deploy as a Node service that supports WebSocket upgrades. A ready-to-use `render.yaml`, `Dockerfile`, and detailed Persian deployment guide are included in `docs/DEPLOYMENT.md`.
+
+The simplest free demo path is a Render Free Web Service. It supports Node services and WebSocket connections while active, but sleeps after 15 minutes without inbound traffic and loses in-memory rooms when restarted. For an always-running low-traffic server, use a small Oracle Cloud Always Free VM or another VPS and run `npm start` behind HTTPS/reverse proxy.
 
 Use `PORT` from the deployment platform:
 

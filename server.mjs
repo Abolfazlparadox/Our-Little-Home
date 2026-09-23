@@ -391,6 +391,9 @@ function serveStatic(req, res) {
   let requestPath = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
   try { requestPath = decodeURIComponent(requestPath); } catch (_) { /* keep original */ }
   if (requestPath === '/') requestPath = '/index.html';
+  if (requestPath === '/uploads' || requestPath.startsWith('/uploads/')) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Not found'); return;
+  }
   const filePath = path.resolve(ROOT, `.${requestPath}`);
   if (!(filePath === ROOT || filePath.startsWith(`${ROOT}${path.sep}`)) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Not found'); return;

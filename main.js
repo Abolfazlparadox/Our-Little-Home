@@ -76,6 +76,11 @@ const REPLY_LINES = [
   'هر جا تو باشی، همون‌جا خوبه.',
   'باشه، امشب رو برای خودمون نگه می‌داریم.',
 ];
+const MEMORY_PHOTOS = [
+  { src: 'assets/memories/memory-car-flowers.jpg', title: 'یک شب پر از گل', detail: 'دست‌های ما، راه کوتاه خانه' },
+  { src: 'assets/memories/memory-mirror.jpg', title: 'یک قاب دونفره', detail: 'کنار هم، نزدیک آینه' },
+  { src: 'assets/memories/memory-picnic.jpg', title: 'قرار زیر درخت', detail: 'یک بعدازظهر آرام بیرون از خانه' },
+];
 
 function createDefaultState() {
   return {
@@ -2150,16 +2155,20 @@ function updatePhoneContent(tab = 'home') {
   } else if (tab === 'map') {
     content.innerHTML = `<div class="phone-hello"><div><span class="eyebrow">چند قدم آن‌طرف‌تر</span><h4>محله‌ی ما</h4><p>راه‌ها کوتاه‌اند؛ خاطره‌ها نه.</p></div></div><div class="map-card"><div class="map-road"></div><div class="map-road two"></div><div class="map-location home"><span>⌂</span>خانه</div><div class="map-location cafe"><span>☕</span>کافه</div><div class="map-location park"><span>☼</span>پارک</div><div class="map-location car"><span>▱</span>ماشین</div></div><div class="phone-list-row" style="margin-top:10px"><span class="list-icon">↗</span><div><b>برای رفتن، از در بیرون بروید</b><small>ماشین کنار خیابان منتظر است.</small></div></div>`;
   } else if (tab === 'memories') {
-    content.innerHTML = `<div class="memory-thumb"><img src="assets/couple.png" alt="آلبوم شما" /><div class="memory-overlay"><div><b>یک قاب برای هر روز</b><small>ابوالفضل و راضیه</small></div><span class="heart-badge">♥</span></div></div>${state.memories.map((memory) => `<div class="memory-item"><span>${memory.icon || '✦'}</span><div><b>${memory.title}</b><small>${memory.detail}</small></div></div>`).join('')}`;
+    content.innerHTML = `<div class="memory-thumb"><img src="assets/couple.png" alt="آلبوم شما" /><div class="memory-overlay"><div><b>یک قاب برای هر روز</b><small>ابوالفضل و راضیه</small></div><span class="heart-badge">♥</span></div></div><div class="memory-section-heading"><span class="eyebrow">قاب‌های شخصی شما</span><b>خاطرات تصویری</b></div>${memoryPhotoMarkup()}${state.memories.map((memory) => `<div class="memory-item"><span>${memory.icon || '✦'}</span><div><b>${memory.title}</b><small>${memory.detail}</small></div></div>`).join('')}`;
   }
   content.querySelectorAll('[data-phone-action="decor"]').forEach((button) => button.addEventListener('click', () => { closePanels(); openDecorPanel(); }));
   content.querySelectorAll('[data-phone-action="cook"]').forEach((button) => button.addEventListener('click', () => { closePanels(); openCooking(); }));
 }
 
+function memoryPhotoMarkup() {
+  return `<div class="memory-photo-grid">${MEMORY_PHOTOS.map((photo) => `<figure class="memory-photo-card"><img src="${photo.src}" alt="${photo.title}" loading="lazy" /><figcaption><b>${photo.title}</b><small>${photo.detail}</small></figcaption></figure>`).join('')}</div>`;
+}
+
 function openMemoryModal() {
   runtime.overlayOpen = true;
   $('#memory-modal').classList.remove('hidden');
-  $('#memory-content').innerHTML = `<div class="memory-thumb"><img src="assets/couple.png" alt="تصویر خاطره" /><div class="memory-overlay"><div><b>خانه‌ی ما</b><small>هر روز یک قاب تازه</small></div><span class="heart-badge">♥</span></div></div>${state.memories.map((memory) => `<div class="memory-item"><span>${memory.icon || '✦'}</span><div><b>${memory.title}</b><small>${memory.detail}</small></div></div>`).join('')}`;
+  $('#memory-content').innerHTML = `<div class="memory-thumb"><img src="assets/couple.png" alt="تصویر خاطره" /><div class="memory-overlay"><div><b>خانه‌ی ما</b><small>هر روز یک قاب تازه</small></div><span class="heart-badge">♥</span></div></div><div class="memory-section-heading"><span class="eyebrow">قاب‌های شخصی شما</span><b>خاطرات تصویری</b></div>${memoryPhotoMarkup()}${state.memories.map((memory) => `<div class="memory-item"><span>${memory.icon || '✦'}</span><div><b>${memory.title}</b><small>${memory.detail}</small></div></div>`).join('')}`;
 }
 
 const QUICK_PHRASES = ['بیا بریم', 'صبر کن', 'بیا اینو ببین', 'چایی می‌خوری؟', 'گرسنه‌ای؟', 'بریم بیرون؟', 'دوستت دارم', 'دلم برات تنگ شده', 'بیا بغلم', 'خسته‌ای؟', 'امشب فیلم ببینیم؟'];

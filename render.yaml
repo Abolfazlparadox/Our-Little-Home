@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: our-little-home
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
