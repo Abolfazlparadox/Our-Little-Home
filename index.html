@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#18231f" />
+  <title>خانه‌ی ما | Our Little Home</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="start-screen" class="screen active">
+      <div class="start-image" aria-hidden="true"></div>
+      <div class="start-vignette" aria-hidden="true"></div>
+      <div class="start-grain" aria-hidden="true"></div>
+      <header class="start-header">
+        <div class="brand-lockup">
+          <span class="brand-symbol">✦</span>
+          <div>
+            <strong>خانه‌ی ما</strong>
+            <span>Our Little Home</span>
+          </div>
+        </div>
+        <div class="header-note">یک شبیه‌ساز کوچک برای یک زندگی واقعی</div>
+        <div class="version-chip">نسخه‌ی عمارت کوچک <b>۰۱</b></div>
+      </header>
+
+      <main class="start-main">
+        <div class="start-copy">
+          <div class="eyebrow"><span class="eyebrow-dot"></span> یک خانه، دو دل، هر روز باهم</div>
+          <h1>حتی وقتی دوریم،<br /><em>اینجا کنار همیم.</em></h1>
+          <p class="start-lede">یک زندگی کوچک را با ابوالفضل و راضیه بسازید؛ از اولین چای صبح تا چراغ‌های شب.</p>
+          <div class="quote-card">
+            <span class="quote-mark">“</span>
+            <p>این خونه مال ماست؛ کم‌کم می‌سازیمش.</p>
+            <span class="quote-author">یادداشت روی یخچال</span>
+          </div>
+          <div class="start-actions">
+            <button class="primary-btn wide" data-action="new-game"><span>شروع زندگی</span><i>←</i></button>
+            <button class="ghost-btn" data-action="continue-game" id="continue-btn"><span>ادامه</span><small>از آخرین ذخیره</small></button>
+          </div>
+          <div class="start-links">
+            <button data-action="open-customize-start"><span class="link-icon">◌</span> شخصی‌سازی</button>
+            <button data-action="open-memories-start"><span class="link-icon">♡</span> خاطرات</button>
+            <button data-action="open-settings-start"><span class="link-icon">⌁</span> تنظیمات</button>
+          </div>
+        </div>
+
+        <div class="couple-card-wrap">
+          <div class="couple-card-glow"></div>
+          <div class="couple-card">
+            <div class="couple-photo">
+              <img src="assets/couple.png" alt="تصویر ابوالفضل و راضیه" />
+              <div class="photo-shine"></div>
+              <div class="photo-caption"><span>خانه‌ی ما</span><small>یک قاب برای هر روز</small></div>
+            </div>
+            <div class="couple-card-footer">
+              <div class="mini-avatar-row"><span class="mini-avatar abolfazl">ا</span><span class="mini-avatar razieh">ر</span></div>
+              <div><strong>ابوالفضل و راضیه</strong><span>زندگی مشترک، نسخه‌ی اول</span></div>
+              <span class="heart-badge">♥</span>
+            </div>
+          </div>
+          <div class="memory-float memory-float-top"><span>☕</span><div><b>چای عصرانه</b><small>امروز باهم</small></div></div>
+          <div class="memory-float memory-float-bottom"><span>✦</span><div><b>خاطره‌ی تازه</b><small>قابل ذخیره در آلبوم</small></div></div>
+        </div>
+      </main>
+      <footer class="start-footer"><span>برای دسکتاپ و موبایل طراحی شده</span><span class="footer-dot"></span><span>با عشق ساخته شده برای دو نفر</span></footer>
+
+      <div class="overlay-panel hidden" id="multiplayer-modal"><div class="panel-backdrop" data-action="close-multiplayer"></div><div class="multiplayer-card"><button class="close-btn" data-action="close-multiplayer">×</button><div class="mp-header"><div class="mp-mark">⌁</div><span class="eyebrow">اتصال دونفره</span><h2>همین خانه، <em>همزمان</em> برای هر دو نفر</h2><p>یک اتاق بسازید یا با کدی که همدیگر می‌فرستید وارد همان خانه شوید.</p></div><div class="mp-mode-tabs"><button class="active" data-mp-mode="create">ساختن اتاق</button><button data-mp-mode="join">پیوستن به اتاق</button></div><div class="mp-field-label">من کدام شخصیت هستم؟</div><div class="mp-role-row"><button class="mp-role active" data-role="abolfazl"><span class="tab-avatar tab-a">ا</span><span><b>من ابوالفضلم</b><small>ابوالفضل</small></span><i>✓</i></button><button class="mp-role" data-role="razieh"><span class="tab-avatar tab-r">ر</span><span><b>من راضیه‌ام</b><small>راضیه</small></span><i>✓</i></button></div><div class="mp-join-field hidden" id="mp-join-field"><label for="room-code-input">کد اتاق</label><input id="room-code-input" maxlength="8" autocomplete="off" placeholder="مثلاً HM-7K2Q" dir="ltr" /></div><div class="mp-status" id="mp-status"><span class="status-dot"></span><span>برای شروع، نقش خودتان را انتخاب کنید.</span></div><div class="mp-code-box hidden" id="mp-code-box"><small>کد اتاق شما</small><strong id="room-code-label">HM-----</strong><button data-action="copy-room-code">کپی کد</button><p>این کد را برای راضیه یا ابوالفضل بفرستید.</p></div><div class="mp-actions"><button class="primary-btn full" data-action="create-room" id="create-room-btn">ساختن اتاق و دریافت کد <i>←</i></button><button class="primary-btn full hidden" data-action="join-room" id="join-room-btn">پیوستن به خانه <i>←</i></button><button class="primary-btn full hidden" data-action="enter-multiplayer-room" id="enter-room-btn">ورود به شخصی‌سازی <i>←</i></button><button class="secondary-btn full" data-action="offline-mode">بازی آفلاین همین دستگاه</button></div><div class="mp-connection-note"><span id="mp-connection-dot" class="connection-dot"></span><span id="mp-connection-text">سرور اتاق آماده نیست</span></div></div></div>
+    </section>
+
+    <section id="customize-screen" class="screen">
+      <div class="custom-bg-shape shape-one"></div><div class="custom-bg-shape shape-two"></div>
+      <header class="inner-header">
+        <button class="back-btn" data-action="back-to-start">→ <span>بازگشت</span></button>
+        <div class="brand-lockup compact"><span class="brand-symbol">✦</span><div><strong>خانه‌ی ما</strong><span>شخصی‌سازی همراه‌ها</span></div></div>
+        <div class="save-status"><span class="status-dot"></span><span id="custom-role-status">تغییرات خودکار ذخیره می‌شوند</span></div>
+      </header>
+      <main class="custom-main">
+        <div class="custom-intro">
+          <div class="eyebrow"><span class="eyebrow-dot"></span> قبل از ورود به خانه</div>
+          <h2>دو نفری که<br /><em>این خانه را می‌سازند.</em></h2>
+          <p>جزئیات کوچک را انتخاب کنید. هر چیزی که اینجا می‌سازید، در آینه‌ی خانه‌تان هم دیده می‌شود.</p>
+          <div class="character-tabs">
+            <button class="char-tab active" data-character="abolfazl"><span class="tab-avatar tab-a">ا</span><span><b>ابوالفضل</b><small>شخصیت اول</small></span><i>✓</i></button>
+            <button class="char-tab" data-character="razieh"><span class="tab-avatar tab-r">ر</span><span><b>راضیه</b><small>شخصیت دوم</small></span><i>✓</i></button>
+          </div>
+          <div class="custom-tip"><span>✦</span><p>رنگ‌ها و لباس‌ها را هر وقت خواستید از کنار آینه یا کمد تغییر دهید.</p></div>
+        </div>
+        <div class="custom-stage-shell">
+          <div class="stage-label"><span class="stage-dot"></span> نمای کامل شخصیت</div>
+          <canvas id="preview-canvas"></canvas>
+          <div class="stage-floor"></div>
+          <div class="stage-name" id="preview-name">ابوالفضل</div>
+          <div class="stage-hint">برای دیدن جزئیات، نشانگر را روی مدل حرکت دهید</div>
+        </div>
+        <div class="custom-controls card-surface">
+          <div class="control-heading"><div><span class="eyebrow">ظاهر و استایل</span><h3 id="custom-character-title">جزئیات ابوالفضل</h3></div><span class="counter-pill">۰۲ / ۰۲</span></div>
+          <div class="control-group"><label>رنگ پوست</label><div class="swatch-row" id="skin-swatches"></div></div>
+          <div class="control-group"><label>فرم صورت</label><div class="pill-row" id="face-shapes"></div></div>
+          <div class="control-group"><label>رنگ چشم</label><div class="swatch-row" id="eye-swatches"></div></div>
+          <div class="control-group"><label>مدل مو</label><div class="pill-row" id="hair-styles"></div></div>
+          <div class="control-group"><label>رنگ مو</label><div class="swatch-row" id="hair-swatches"></div></div>
+          <div class="control-group"><label>فرم بدن و قد</label><div class="pill-row" id="body-builds"></div><div class="pill-row" id="height-options" style="margin-top:7px"></div></div>
+          <div class="control-group"><label>اکسسوری</label><div class="pill-row" id="accessory-options"></div></div>
+          <div class="control-group"><label>لباس امضای شما</label><div class="outfit-row" id="outfit-options"></div></div>
+          <button class="primary-btn full" data-action="enter-home"><span>ورود به خانه‌ی ما</span><i>←</i></button>
+        </div>
+      </main>
+    </section>
+
+    <section id="game-screen" class="screen">
+      <canvas id="game-canvas"></canvas>
+      <div class="game-shade"></div>
+      <div class="game-ui">
+        <header class="game-topbar">
+          <div class="game-brand"><span class="brand-symbol">✦</span><div><strong>خانه‌ی ما</strong><small id="location-label">خانه · نشیمن</small></div></div>
+          <div class="day-info"><div class="sun-icon" id="sun-icon">☼</div><div><b id="time-label">غروب · ۱۸:۳۰</b><span id="weather-label">هوای آرام</span></div></div>
+          <div class="network-pill" id="network-pill"><span class="connection-dot"></span><div><b id="network-status-label">آفلاین</b><small id="network-room-label">اتصال محلی</small></div></div>
+          <div class="hud-actions"><button class="hud-icon-btn" data-action="open-chat" aria-label="گفت‌وگوی سریع">☏<span>گفت‌وگو</span></button><button class="hud-icon-btn" data-action="open-phone" aria-label="تلفن">▣<span>تلفن</span></button><button class="hud-icon-btn" data-action="save-game" aria-label="ذخیره">⌁<span>ذخیره</span></button><button class="hud-icon-btn" data-action="pause-game" aria-label="مکث">Ⅱ<span>مکث</span></button></div>
+        </header>
+        <div class="stat-strip">
+          <div class="stat-card relationship"><span class="stat-icon">♡</span><div><b id="relationship-stat">۷۸٪</b><small>نزدیکی</small></div><div class="stat-bar"><i id="relationship-bar"></i></div></div>
+          <div class="stat-card"><span class="stat-icon">☼</span><div><b id="happiness-stat">۷۲٪</b><small>حال خوب</small></div><div class="stat-bar"><i id="happiness-bar"></i></div></div>
+          <div class="stat-card"><span class="stat-icon">◒</span><div><b id="energy-stat">۸۲٪</b><small>انرژی</small></div><div class="stat-bar"><i id="energy-bar"></i></div></div>
+          <div class="wallet-card"><span class="wallet-icon">▱</span><div><b id="wallet-stat">۲٬۴۵۰٬۰۰۰</b><small>تومان مشترک</small></div><button data-action="open-phone-money">+</button></div>
+        </div>
+        <div class="top-right-stack"><div class="objective-card"><span class="objective-kicker">امروز در خانه</span><strong id="objective-title">یک عصر آرام باهم بسازید</strong><span id="objective-subtitle">به راضیه نزدیک شوید و سلام کنید</span><div class="objective-progress"><i id="objective-progress"></i></div></div><div class="weather-chip" id="weather-chip"><span>✦</span><b>هوای خانه</b><small>چراغ‌ها روشن‌اند</small></div></div>
+        <div class="center-reticle" id="crosshair"><span></span></div>
+        <div class="interaction-prompt hidden" id="interaction-prompt"><div class="prompt-key">E</div><div><b id="prompt-title">تعامل</b><small id="prompt-subtitle">برای دیدن گزینه‌ها</small></div><div class="prompt-arrow">↗</div></div>
+        <div class="affection-prompt hidden" id="affection-prompt"><span>F</span> یک لحظه‌ی صمیمی</div>
+        <div class="controls-hint"><span class="keycap">WASD</span><span>حرکت</span><span class="keycap">SHIFT</span><span>دویدن</span><span class="keycap">E</span><span>تعامل</span><span class="keycap">F</span><span>محبت</span><span class="keycap">TAB</span><span>تلفن</span></div>
+        <div class="toast-stack" id="toast-stack"></div>
+        <div class="scene-caption" id="scene-caption"><span class="caption-line"></span><span id="caption-text">خانه‌ی ما، از همین‌جا شروع می‌شود.</span></div>
+      </div>
+      <div id="touch-controls" class="touch-controls">
+        <div class="joystick" id="joystick"><div class="joystick-ring"></div><div class="joystick-knob" id="joystick-knob"></div></div>
+        <div class="touch-actions"><button data-touch="interact"><b>E</b><span>تعامل</span></button><button data-touch="affection"><b>♥</b><span>محبت</span></button><button data-touch="phone"><b>▣</b><span>تلفن</span></button></div>
+      </div>
+
+      <div class="overlay-panel hidden" id="action-sheet"><div class="panel-backdrop" data-action="close-panels"></div><div class="bottom-sheet"><div class="sheet-handle"></div><div class="sheet-header"><div><span class="eyebrow">لحظه‌ی کنار هم</span><h3 id="sheet-title">با راضیه</h3></div><button class="close-btn" data-action="close-panels">×</button></div><div class="action-grid" id="action-grid"></div></div></div>
+
+      <div class="overlay-panel hidden" id="phone-panel"><div class="panel-backdrop" data-action="close-panels"></div><div class="phone-window"><div class="phone-head"><div class="phone-notch"></div><div class="phone-status"><span>خانه‌ی ما</span><span id="phone-time">۱۸:۳۰</span></div><div class="phone-title-row"><div><span class="eyebrow">دنیای کوچک شما</span><h3>همراه</h3></div><button class="close-btn" data-action="close-panels">×</button></div></div><div class="phone-tabs"><button class="active" data-phone-tab="home">خانه</button><button data-phone-tab="plan">امروز</button><button data-phone-tab="map">نقشه</button><button data-phone-tab="memories">خاطرات</button></div><div class="phone-content" id="phone-content"></div><div class="phone-home-indicator"></div></div></div>
+
+      <div class="overlay-panel hidden" id="chat-panel"><div class="panel-backdrop" data-action="close-panels"></div><div class="quick-chat-card"><div class="modal-head"><div><span class="eyebrow">گفت‌وگوی کوتاه</span><h3>یک جمله برای همراهت</h3></div><button class="close-btn" data-action="close-panels">×</button></div><div class="quick-chat-list" id="quick-chat-list"></div><div class="chat-log" id="chat-log"></div></div></div>
+
+      <div class="overlay-panel hidden" id="pause-panel"><div class="pause-card"><div class="pause-symbol">✦</div><span class="eyebrow">یک نفس کوتاه</span><h2>خانه هنوز منتظر شماست.</h2><p>هر چیزی که ساخته‌اید، همین‌جا امن می‌ماند.</p><div class="pause-actions"><button class="primary-btn full" data-action="resume-game">ادامه‌ی زندگی</button><button class="secondary-btn full" data-action="save-game">ذخیره‌ی بازی</button><button class="text-btn" data-action="back-to-title">بازگشت به صفحه‌ی اول</button></div><div class="pause-footer"><span>WASD برای حرکت</span><span>·</span><span>Esc برای مکث</span></div></div></div>
+
+      <div class="overlay-panel hidden" id="custom-modal"><div class="panel-backdrop" data-action="close-panels"></div><div class="modal-card custom-modal-card"><div class="modal-head"><div><span class="eyebrow">آینه‌ی کنار اتاق</span><h3>جزئیات خودتان را عوض کنید</h3></div><button class="close-btn" data-action="close-panels">×</button></div><div class="custom-modal-body"><div class="modal-preview"><canvas id="modal-preview-canvas"></canvas><span id="modal-preview-name">ابوالفضل</span></div><div class="modal-controls"><div class="character-tabs compact-tabs"><button class="char-tab active" data-modal-character="abolfazl"><span class="tab-avatar tab-a">ا</span><span><b>ابوالفضل</b><small>شخصیت اول</small></span><i>✓</i></button><button class="char-tab" data-modal-character="razieh"><span class="tab-avatar tab-r">ر</span><span><b>راضیه</b><small>شخصیت دوم</small></span><i>✓</i></button></div><div id="modal-options"></div><button class="primary-btn full" data-action="save-custom-modal">ذخیره‌ی ظاهر</button></div></div></div></div>
+
+      <div class="overlay-panel hidden" id="dialogue-modal"><div class="panel-backdrop" data-action="close-panels"></div><div class="dialogue-card"><div class="dialogue-photo"><img src="assets/couple.png" alt="" /></div><div class="dialogue-body"><span class="eyebrow">راضیه</span><p id="dialogue-text">خسته نباشی ❤️</p><div class="dialogue-actions"><button class="primary-btn" data-action="dialogue-reply">جواب بده</button><button class="text-btn" data-action="close-panels">بعداً صحبت می‌کنیم</button></div></div></div></div>
+
+      <div class="overlay-panel hidden" id="cooking-panel"><div class="panel-backdrop" data-action="close-panels"></div><div class="modal-card cooking-card"><div class="modal-head"><div><span class="eyebrow">آشپزخانه</span><h3 id="cooking-title">باهم چی درست کنیم؟</h3></div><button class="close-btn" data-action="close-panels">×</button></div><div id="cooking-content"></div></div></div>
+
+      <div class="overlay-panel hidden" id="decor-panel"><div class="panel-backdrop" data-action="close-panels"></div><div class="modal-card decor-card"><div class="modal-head"><div><span class="eyebrow">خانه‌ی ما</span><h3>یک گوشه را قشنگ‌تر کنیم</h3></div><button class="close-btn" data-action="close-panels">×</button></div><p class="modal-lede">چیزهای کوچک، حال خانه را عوض می‌کنند. انتخاب کنید و باهم بخرید.</p><div class="decor-grid" id="decor-grid"></div></div></div>
+
+      <div class="overlay-panel hidden" id="date-panel"><div class="panel-backdrop" data-action="close-panels"></div><div class="modal-card date-card"><div class="modal-head"><div><span class="eyebrow">یک وقت دونفره</span><h3>امشب کجا برویم؟</h3></div><button class="close-btn" data-action="close-panels">×</button></div><p class="modal-lede">قرار نیست بزرگ باشد؛ فقط باید مال خودتان باشد.</p><div class="date-options" id="date-options"></div></div></div>
+
+      <div class="overlay-panel hidden" id="memory-modal"><div class="panel-backdrop" data-action="close-panels"></div><div class="modal-card memory-card"><div class="modal-head"><div><span class="eyebrow">آلبوم دو نفره</span><h3>خاطراتی که ساخته‌اید</h3></div><button class="close-btn" data-action="close-panels">×</button></div><div id="memory-content"></div></div></div>
+
+      <div class="tiny-save-toast" id="save-toast"><span>✓</span> پیشرفت شما ذخیره شد</div>
+    </section>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

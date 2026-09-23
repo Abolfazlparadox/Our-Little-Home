@@ -1,0 +1,16 @@
+{
+  "name": "our-little-home",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "خانه‌ی ما — a cozy real-time two-player browser life simulation for Abolfazl and Razieh",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "check": "node --check main.js && node --check server.mjs",
+    "smoke": "node tests/multiplayer-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
