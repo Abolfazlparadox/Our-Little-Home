@@ -160,6 +160,7 @@ const runtime = {
   localAnimation: 'idle',
   interactionLock: false,
   cameraShake: 0,
+  seated: null,
   localRole: 'abolfazl',
   chatLog: [],
   network: {
@@ -174,6 +175,7 @@ const runtime = {
     reconnectTimer: null,
     reconnectAttempts: 0,
     lastStateSent: 0,
+    lastSharedClock: 0,
     pendingJoin: null,
     intentionalClose: false,
   },
@@ -198,6 +200,7 @@ const runtime = {
   dynamicLights: [],
   heartTimers: [],
   lastTime: 0,
+  lastFootstep: 0,
   saveTimer: 0,
   hudTimer: 0,
   bobTime: 0,
@@ -517,6 +520,7 @@ function applySharedState(shared) {
   if (!shared || typeof shared !== 'object') return;
   const currentPosition = { ...state.playerPosition };
   state = normaliseState({ ...state, ...shared, playerPosition: currentPosition });
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); savedStateExists = true; updateContinueButton(); } catch (_) { /* local persistence is optional */ }
   if (runtime.gameReady) {
     addDecorations();
     if (runtime.network.online) rebuildRemotePlayers();
@@ -784,11 +788,19 @@ function startSynchronizedInteraction(action, remoteId, event = {}) {
   for (let i = 0; i < 5; i += 1) setTimeout(() => createHeart(), i * 125);
 }
 
+function startLocalSeat(action = 'sit', duration = 3.2) {
+  runtime.seated = { action };
+  runtime.localAction = { action, time: duration, remoteId: null };
+  runtime.interactionLock = true;
+  runtime.velocity.set(0, 0, 0);
+  runtime.localAnimation = 'sit';
+}
+
 function updateLocalInteraction(dt) {
   if (!runtime.localAction) return;
   runtime.localAction.time -= dt;
   animateLocalCamera(runtime.localAction.action, runtime.localAction.time);
-  if (runtime.localAction.time <= 0) { runtime.localAction = null; runtime.interactionLock = false; runtime.localAnimation = 'idle'; runtime.cameraShake = 0; }
+  if (runtime.localAction.time <= 0) { runtime.localAction = null; runtime.seated = null; runtime.interactionLock = false; runtime.localAnimation = 'idle'; runtime.cameraShake = 0; }
 }
 
 function animateLocalCamera(action, remaining) {
@@ -799,6 +811,10 @@ function maybeSendNetworkState(now) {
   if (!runtime.network.online || !runtime.network.ws || runtime.network.ws.readyState !== WebSocket.OPEN) return;
   if (now - (runtime.network.lastStateSent || 0) < 55) return;
   runtime.network.lastStateSent = now;
+  if (now - (runtime.network.lastSharedClock || 0) > 5000) {
+    runtime.network.lastSharedClock = now;
+    sendNetwork({ type: 'sharedPatch', patch: { day: state.day, minutes: state.minutes, weather: state.weather } });
+  }
   sendNetwork({
     type: 'playerState',
     character: state.characters[runtime.localRole],
@@ -1100,10 +1116,10 @@ function animateAvatar(avatar, animation = 'idle', time = 0) {
   const swing = moving ? Math.sin(t * (animation === 'walk' ? 8 : 11)) * stride : Math.sin(t * 2.2) * .025;
   avatar.rotation.x = 0;
   p.leftHand.position.z = 0; p.rightHand.position.z = 0;
-  p.leftArm.rotation.x = 0;
-  p.rightArm.rotation.x = 0;
-  p.leftLeg.rotation.x = 0;
-  p.rightLeg.rotation.x = 0;
+  p.leftArm.rotation.x = 0; p.leftArm.rotation.z = 0;
+  p.rightArm.rotation.x = 0; p.rightArm.rotation.z = 0;
+  p.leftLeg.rotation.x = 0; p.leftLeg.rotation.z = 0;
+  p.rightLeg.rotation.x = 0; p.rightLeg.rotation.z = 0;
   if (moving) {
     p.leftArm.rotation.x = -swing * .55; p.rightArm.rotation.x = swing * .55;
     p.leftLeg.rotation.x = swing * .27; p.rightLeg.rotation.x = -swing * .27;
@@ -1208,6 +1224,8 @@ function buildWorld() {
   scene.add(runtime.decorationGroup);
   runtime.colliders = [];
   runtime.interactables = [];
+  runtime.remotePlayers.clear();
+  runtime.partner = null;
   runtime.dynamicLights = [];
 
   scene.add(new THREE.HemisphereLight(0xadcac4, 0x18241e, 1.35));
@@ -1499,7 +1517,11 @@ function updatePlayer(dt) {
   runtime.playerPos.copy(next);
   runtime.moving = runtime.velocity.length() > .08;
   runtime.localAnimation = runtime.moving ? (speed > 3 ? 'run' : 'walk') : 'idle';
-  if (runtime.moving) runtime.bobTime += dt * (speed > 3 ? 11 : 7);
+  if (runtime.moving) {
+    runtime.bobTime += dt * (speed > 3 ? 11 : 7);
+    const now = performance.now();
+    if (now - runtime.lastFootstep > (speed > 3 ? 290 : 430)) { runtime.lastFootstep = now; playSfx('footstep'); }
+  }
 }
 
 function resolveCollisions(position) {
@@ -1560,7 +1582,8 @@ function updateCamera(dt) {
     return;
   }
   const bob = runtime.moving ? Math.sin(runtime.bobTime) * .027 : 0;
-  runtime.camera.position.set(runtime.playerPos.x, runtime.playerPos.y + bob, runtime.playerPos.z);
+  const seatedHeight = runtime.seated ? 1.08 : runtime.playerPos.y;
+  runtime.camera.position.set(runtime.playerPos.x, seatedHeight + bob, runtime.playerPos.z);
   runtime.camera.rotation.y = runtime.yaw;
   runtime.camera.rotation.x = runtime.pitch + (runtime.moving ? Math.cos(runtime.bobTime * .5) * .007 : 0) + (runtime.cameraShake || 0);
 }
@@ -1805,8 +1828,8 @@ function runInteraction(targetId, action) {
     case 'tease': updatePartnerAction('tease'); applyDelta({ relationship: 2, happiness: 3 }); showToast('شوخی‌تان جواب داد؛ البته کمی هم اخم کرد.', true); updateHUD(); break;
     case 'highfive': updatePartnerAction('highfive'); applyDelta({ relationship: 2, happiness: 2 }); showToast('های‌فایو؛ تیم دونفره آماده است.', true); updateHUD(); break;
     case 'dance': updatePartnerAction('dance'); applyDelta({ relationship: 3, happiness: 5, energy: -3 }); addMemoryOnce('dance', { icon: '♫', title: 'رقص وسط خانه', detail: 'چند ثانیه، بدون دلیل خاص' }); showToast('موسیقی را خودتان شروع کردید.', true); updateHUD(); break;
-    case 'sit': applyDelta({ energy: 7, happiness: 2 }); showToast('چند دقیقه بدون عجله نشستید.', false); updateHUD(); break;
-    case 'movie': applyDelta({ happiness: 6, relationship: 2, energy: -2 }); addMemoryOnce('movie', { icon: '▣', title: 'فیلم شبانه', detail: 'پایانش را باهم حدس زدیم' }); showToast('فیلم شروع شد؛ گوشی‌ها کنار.', true); updateHUD(); break;
+    case 'sit': startLocalSeat('sit', 3.5); applyDelta({ energy: 7, happiness: 2 }); showToast('چند دقیقه بدون عجله نشستید.', false); updateHUD(); break;
+    case 'movie': startLocalSeat('sit', 5.5); applyDelta({ happiness: 6, relationship: 2, energy: -2 }); addMemoryOnce('movie', { icon: '▣', title: 'فیلم شبانه', detail: 'پایانش را باهم حدس زدیم' }); showToast('فیلم شروع شد؛ گوشی‌ها کنار.', true); updateHUD(); break;
     case 'cuddle': updatePartnerAction('cuddle'); applyDelta({ happiness: 5, relationship: 3, stress: -3 }); showToast('کنار هم، بی‌نیاز از حرف.', true); updateHUD(); break;
     case 'decorate': openDecorPanel(); break;
     case 'cook': openCooking(); break;
@@ -1816,13 +1839,13 @@ function runInteraction(targetId, action) {
     case 'serve':
       if (state.inventory.preparedFood <= 0) { showToast('اول یک غذا باهم درست کنید.', false); break; }
       state.inventory.preparedFood -= 1; applyDelta({ happiness: 5, relationship: 3, hunger: 18, energy: 4 }); showToast('غذا را کنار هم خوردید.', true); updateHUD(); break;
-    case 'fridge': openPhone('home'); break;
+    case 'fridge': playSfx('fridge'); openPhone('home'); break;
     case 'change': case 'mirror': openGameCustomizer(); break;
     case 'memories': openMemoryModal(); break;
-    case 'outside': state.tasks.outside = true; runtime.playerPos.z = Math.max(runtime.playerPos.z, 10.8); if (runtime.network.online) syncSharedState(); showToast('هوای بیرون خنک‌تر است؛ ماشین همان جلوست.', true); $('#scene-caption').querySelector('#caption-text').textContent = 'محله‌ی ما، چند قدم آن‌طرف‌تر.'; updateHUD(); break;
+    case 'outside': state.tasks.outside = true; runtime.playerPos.z = Math.max(runtime.playerPos.z, 10.8); playSfx('door'); if (runtime.network.online) syncSharedState(); showToast('هوای بیرون خنک‌تر است؛ ماشین همان جلوست.', true); $('#scene-caption').querySelector('#caption-text').textContent = 'محله‌ی ما، چند قدم آن‌طرف‌تر.'; updateHUD(); break;
     case 'car': enterCar(); break;
     case 'date': openDatePanel(targetId); break;
-    case 'rest': applyDelta({ energy: 15, happiness: 2, stress: -4, hunger: -4 }); state.minutes += 90; showToast('خواب کوتاه، حال بهتر.', true); updateHUD(); break;
+    case 'rest': startLocalSeat('rest', 4.2); applyDelta({ energy: 15, happiness: 2, stress: -4, hunger: -4 }); state.minutes += 90; showToast('خواب کوتاه، حال بهتر.', true); updateHUD(); break;
     case 'work':
       state.wallet += 250000; state.minutes += 75; applyDelta({ energy: -12, happiness: -1, stress: 4 });
       showToast('یک ساعت کار؛ دستمزدش به کیف پول مشترک رفت.', true); updateHUD(); break;
@@ -1858,6 +1881,7 @@ function enterCar() {
   runtime.vehicleSeat = 'driver'; runtime.carMode = true;
   runtime.carHeading = runtime.car.rotation.y || 0; runtime.carSpeed = 0;
   state.tasks.outside = true;
+  playSfx('car');
   showToast('آماده‌ای؟ یک دور کوتاه در محله.', true);
   $('#scene-caption').querySelector('#caption-text').textContent = 'چراغ‌ها روشن، موسیقی آرام، راه باز.';
   updateHUD();
@@ -1877,10 +1901,10 @@ function applyVehicleState(vehicle = {}) {
     runtime.carHeading = runtime.vehicleState.heading || runtime.carHeading;
     runtime.carSpeed = runtime.vehicleState.speed || 0;
     state.tasks.outside = true;
-    showToast('راننده شدید؛ همراهتان کنار شماست.', true);
+    playSfx('car'); showToast('راننده شدید؛ همراهتان کنار شماست.', true);
   } else if (nextSeat === 'passenger') {
     runtime.carSpeed = 0; state.tasks.outside = true;
-    showToast('روی صندلی کناری نشستید.', true);
+    playSfx('car'); showToast('روی صندلی کناری نشستید.', true);
   } else if (runtime.network.online) {
     runtime.carSpeed = 0;
   }
@@ -1895,6 +1919,7 @@ function exitCar() {
   }
   runtime.vehicleSeat = null; runtime.carMode = false; runtime.carSpeed = 0;
   runtime.playerPos.set(runtime.car.position.x + 2.5, 1.62, runtime.car.position.z);
+  playSfx('car');
   showToast('رسیدیم. پیاده شویم؟', false);
   $('#scene-caption').querySelector('#caption-text').textContent = 'هر طرف محله، یک خاطره‌ی کوچک.';
 }
@@ -1943,6 +1968,7 @@ function completeCooking(recipe) {
   applyDelta({ happiness: 7, relationship: 3, energy: -2, hunger: 10 });
   addMemoryOnce(`cook-${recipe.id}`, { icon: recipe.icon, title: recipe.name, detail: `روز ${fa(state.day)} · باهم آماده شد` });
   closePanels();
+  playSfx('stove');
   showToast(`${recipe.name} آماده شد؛ نوش جان دونفره!`, true);
   updateHUD(); playTone('success');
 }
@@ -2093,6 +2119,30 @@ function playTone(kind = 'click') {
     gain.gain.setValueAtTime(.0001, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(.028, audioContext.currentTime + .008); gain.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime + duration);
     osc.connect(gain).connect(audioContext.destination); osc.start(); osc.stop(audioContext.currentTime + duration + .02);
   } catch (_) { /* audio is a graceful enhancement */ }
+}
+
+function playSfx(kind = 'click', pan = 0) {
+  if (document.hidden) return;
+  try {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioContext.state === 'suspended') audioContext.resume();
+    const profiles = {
+      footstep: { frequency: 92, duration: .055, gain: .018, type: 'triangle' },
+      door: { frequency: 220, duration: .14, gain: .028, type: 'sine' },
+      fridge: { frequency: 130, duration: .18, gain: .023, type: 'sine' },
+      stove: { frequency: 180, duration: .24, gain: .018, type: 'triangle' },
+      car: { frequency: 78, duration: .28, gain: .035, type: 'sawtooth' },
+      rain: { frequency: 310, duration: .34, gain: .008, type: 'sine' },
+    };
+    const profile = profiles[kind] || profiles.footstep;
+    const osc = audioContext.createOscillator(); const gain = audioContext.createGain();
+    const output = audioContext.createStereoPanner ? audioContext.createStereoPanner() : null;
+    osc.type = profile.type; osc.frequency.setValueAtTime(profile.frequency, audioContext.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(profile.frequency * (kind === 'car' ? 1.25 : .72), audioContext.currentTime + profile.duration);
+    gain.gain.setValueAtTime(.0001, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(profile.gain, audioContext.currentTime + .006); gain.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime + profile.duration);
+    if (output) { output.pan.value = clamp(pan, -1, 1); osc.connect(gain).connect(output).connect(audioContext.destination); } else osc.connect(gain).connect(audioContext.destination);
+    osc.start(); osc.stop(audioContext.currentTime + profile.duration + .02);
+  } catch (_) { /* audio enhancement is intentionally optional */ }
 }
 
 function showToast(message, accent = false) {
