@@ -1,0 +1,10 @@
+name = "our-little-home"
+main = "worker.mjs"
+compatibility_date = "2024-09-23"
+
+# Optional: if using Cloudflare Pages / Static Assets with Worker
+# assets = { directory = "." }
+
+[vars]
+# Change this to your deployed backend URL (e.g. Render / Fly / VPS)
+BACKEND_URL = "https://our-little-home.onrender.com"

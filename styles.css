@@ -370,3 +370,17 @@ img { max-width: 100%; display: block; }
 .furniture-control-row button { width: 29px; height: 27px; border-radius: 7px; border: 1px solid var(--line); background: rgba(255,255,255,.05); color: var(--gold); font-size: 11px; }
 .furniture-control-row button:hover { border-color: rgba(230,189,120,.5); background: rgba(230,189,120,.12); }
 @media (max-width: 760px) { .furniture-control-row b { min-width: 54px; } }
+
+/* ---------- multiplayer server settings ---------- */
+.mp-server-toggle-row { margin-top: 10px; display: flex; justify-content: flex-end; }
+.mp-server-toggle-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--muted); font-size: 8.5px; cursor: pointer; transition: all .2s ease; }
+.mp-server-toggle-btn:hover { color: var(--gold); border-color: rgba(230,189,120,.4); background: rgba(230,189,120,.07); }
+.mp-server-box { margin-top: 8px; padding: 11px; border-radius: 10px; border: 1px solid rgba(230,189,120,.25); background: rgba(14,26,22,.6); text-align: right; }
+.mp-server-box label { display: block; color: var(--cream); font-size: 9px; margin-bottom: 6px; }
+.mp-server-input-row { display: flex; gap: 6px; }
+.mp-server-input-row input { flex: 1; border: 1px solid rgba(241,231,215,.18); border-radius: 8px; background: rgba(7,15,12,.4); color: var(--cream); padding: 8px 10px; font-size: 11px; font-family: monospace; }
+.mp-server-input-row input:focus { outline: none; border-color: var(--gold); }
+.mp-server-input-row button { padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(230,189,120,.35); background: rgba(230,189,120,.15); color: var(--gold); font-size: 9px; cursor: pointer; white-space: nowrap; }
+.mp-server-input-row button:hover { background: rgba(230,189,120,.25); }
+.mp-server-box small { display: block; color: var(--muted-2); font-size: 8px; line-height: 1.5; margin-top: 6px; }
+

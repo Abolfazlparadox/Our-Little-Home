@@ -3,6 +3,7 @@ import * as THREE from './assets/three.module.js';
 const STORAGE_KEY = 'our-little-home-save-v1';
 const NETWORK_SESSION_KEY = 'our-little-home-network-session-v1';
 const SOUND_KEY = 'our-little-home-sound-v1';
+const SERVER_URL_KEY = 'our-little-home-server-url-v1';
 const fa = (value) => Number(value || 0).toLocaleString('fa-IR');
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const $ = (selector) => document.querySelector(selector);
@@ -236,6 +237,43 @@ const runtime = {
   soundEnabled: true,
 };
 
+function normalizeServerWsUrl(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  let str = raw.trim();
+  if (!str) return null;
+  if (!str.startsWith('ws://') && !str.startsWith('wss://')) {
+    if (str.startsWith('http://')) str = 'ws://' + str.slice(7);
+    else if (str.startsWith('https://')) str = 'wss://' + str.slice(8);
+    else {
+      const isHttps = location.protocol === 'https:';
+      str = (isHttps ? 'wss://' : 'ws://') + str;
+    }
+  }
+  try {
+    const u = new URL(str);
+    if (!u.pathname || u.pathname === '/') u.pathname = '/ws';
+    return u.toString();
+  } catch (_) {
+    return str.endsWith('/ws') ? str : `${str.replace(/\/+$/, '')}/ws`;
+  }
+}
+
+function isStaticWorkerDomain() {
+  const host = (location.hostname || '').toLowerCase();
+  return host.endsWith('.workers.dev') || host.endsWith('.pages.dev') || host.endsWith('.github.io');
+}
+
+function getActiveWsUrl() {
+  let custom = null;
+  try { custom = localStorage.getItem(SERVER_URL_KEY); } catch (_) {}
+  if (custom) {
+    const normalized = normalizeServerWsUrl(custom);
+    if (normalized) return normalized;
+  }
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${location.host}/ws`;
+}
+
 try {
   const savedSound = localStorage.getItem(SOUND_KEY);
   if (savedSound !== null) runtime.soundEnabled = savedSound !== '0';
@@ -252,6 +290,15 @@ try {
     runtime.localRole = restored.role || runtime.localRole;
   }
 } catch (_) { /* reconnect is optional */ }
+
+try {
+  const urlParams = new URLSearchParams(window.location.search);
+  const serverParam = urlParams.get('server') || urlParams.get('ws') || urlParams.get('backend');
+  if (serverParam) {
+    const normalized = normalizeServerWsUrl(serverParam);
+    if (normalized) localStorage.setItem(SERVER_URL_KEY, normalized);
+  }
+} catch (_) { /* url params optional */ }
 
 function isGameVisible() { return $('#game-screen').classList.contains('active'); }
 function isMobile() { return window.matchMedia('(max-width: 760px)').matches || 'ontouchstart' in window; }
@@ -353,6 +400,8 @@ function handleAction(action) {
       openGame();
       break;
     case 'open-customize-start': openCustomize(true); break;
+    case 'toggle-server-settings': toggleServerSettings(); break;
+    case 'save-server-url': saveServerUrlFromInput(); break;
     case 'close-multiplayer': closeMultiplayerModal(); break;
     case 'create-room': createCoupleRoom(); break;
     case 'join-room': joinCoupleRoom(); break;
@@ -418,6 +467,65 @@ function openStartSettings() {
 }
 
 /* ---------- realtime room / multiplayer ---------- */
+function updateServerSettingsUI() {
+  let custom = null;
+  try { custom = localStorage.getItem(SERVER_URL_KEY); } catch (_) {}
+  const input = $('#server-url-input');
+  const summary = $('#mp-server-summary');
+  if (input && custom) input.value = custom;
+  if (summary) {
+    if (custom) {
+      try {
+        const u = new URL(custom);
+        summary.textContent = `سرور: ${u.host}`;
+      } catch (_) {
+        summary.textContent = 'سرور: سفارشی';
+      }
+    } else if (isStaticWorkerDomain()) {
+      summary.textContent = 'سرور: نیاز به تنظیم بک‌اند';
+    } else {
+      summary.textContent = 'سرور اتاق: خودکار';
+    }
+  }
+  if (isStaticWorkerDomain() && !custom) {
+    $('#mp-server-box')?.classList.remove('hidden');
+    const arrow = $('#mp-server-arrow');
+    if (arrow) arrow.textContent = '▴';
+  }
+}
+
+function toggleServerSettings() {
+  const box = $('#mp-server-box');
+  const arrow = $('#mp-server-arrow');
+  if (!box) return;
+  const isHidden = box.classList.toggle('hidden');
+  if (arrow) arrow.textContent = isHidden ? '▾' : '▴';
+}
+
+function saveServerUrlFromInput() {
+  const input = $('#server-url-input');
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    try { localStorage.removeItem(SERVER_URL_KEY); } catch (_) {}
+    updateServerSettingsUI();
+    showToast('آدرس سرور به حالت پیش‌فرض بازگشت.', false);
+    leaveNetworkSession();
+    connectToRoomServer();
+    return;
+  }
+  const normalized = normalizeServerWsUrl(val);
+  if (!normalized) {
+    showToast('آدرس سرور نامعتبر است.', false);
+    return;
+  }
+  try { localStorage.setItem(SERVER_URL_KEY, normalized); } catch (_) {}
+  updateServerSettingsUI();
+  showToast('آدرس سرور اتاق با موفقیت ذخیره شد.', true);
+  leaveNetworkSession();
+  connectToRoomServer();
+}
+
 function openMultiplayerModal(mode = 'create') {
   const modal = $('#multiplayer-modal');
   if (!modal) return;
@@ -425,6 +533,7 @@ function openMultiplayerModal(mode = 'create') {
   setMultiplayerMode(mode);
   const role = runtime.network.role || runtime.localRole || 'abolfazl';
   setSelectedRole(role);
+  updateServerSettingsUI();
   setRoomStatus('برای شروع، نقش خودتان را انتخاب کنید.', 'idle');
   setConnectionIndicator(runtime.network.status || 'offline');
   connectToRoomServer();
@@ -489,13 +598,29 @@ function connectToRoomServer() {
     setRoomStatus('این پیش‌نمایش سرور اتاق ندارد؛ حالت آفلاین همچنان آماده است.', 'error');
     return;
   }
+
+  let custom = null;
+  try { custom = localStorage.getItem(SERVER_URL_KEY); } catch (_) {}
+  if (!custom && isStaticWorkerDomain()) {
+    network.status = 'offline';
+    setConnectionIndicator('offline');
+    setRoomStatus('بازی روی Workers.dev اجرا شده است. برای اتاق آنلاین، آدرس سرور بک‌اند (مانند Render) را در کادر تنظیم سرور وارد کنید.', 'error');
+    $('#mp-server-box')?.classList.remove('hidden');
+    const arrow = $('#mp-server-arrow');
+    if (arrow) arrow.textContent = '▴';
+    return;
+  }
+
   network.status = 'connecting'; setConnectionIndicator('connecting');
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  try { network.ws = new WebSocket(`${protocol}//${location.host}/ws`); } catch (error) {
-    network.status = 'offline'; setConnectionIndicator('offline'); setRoomStatus('اتصال اتاق در دسترس نیست؛ حالت آفلاین را انتخاب کنید.', 'error'); return;
+  const wsUrl = getActiveWsUrl();
+  try {
+    network.ws = new WebSocket(wsUrl);
+  } catch (error) {
+    network.status = 'offline'; setConnectionIndicator('offline'); setRoomStatus('اتصال اتاق در دسترس نیست؛ آدرس سرور را بررسی کنید.', 'error'); return;
   }
   network.ws.addEventListener('open', () => {
     network.status = 'connected'; network.reconnectAttempts = 0; setConnectionIndicator('connected');
+    setRoomStatus('سرور اتاق متصل شد؛ آماده ساختن یا ورود به اتاق.', 'success');
     if (network.pendingJoin) { const pending = network.pendingJoin; network.pendingJoin = null; sendNetwork(pending); }
   });
   network.ws.addEventListener('message', (event) => {
@@ -503,7 +628,14 @@ function connectToRoomServer() {
   });
   network.ws.addEventListener('error', () => {
     network.status = 'disconnected'; setConnectionIndicator('disconnected');
-    if (!network.roomCode) setRoomStatus('سرور اتاق پاسخ نداد؛ می‌توانید آفلاین بازی کنید.', 'error');
+    if (!network.roomCode) {
+      if (isStaticWorkerDomain() && !custom) {
+        setRoomStatus('سرور اتاق در Workers.dev فعال نیست؛ لطفاً در کادر تنظیم سرور، آدرس سرور بک‌اند را وارد کنید.', 'error');
+        $('#mp-server-box')?.classList.remove('hidden');
+      } else {
+        setRoomStatus('سرور اتاق پاسخ نداد؛ آدرس سرور را بررسی کنید یا آفلاین بازی کنید.', 'error');
+      }
+    }
   });
   network.ws.addEventListener('close', () => {
     network.ws = null;
@@ -708,7 +840,7 @@ function rebuildRemotePlayers() {
       const group = makeAvatar(character);
       group.userData.remoteClientId = id; group.userData.role = player.role;
       group.position.set(player.state?.position?.x || (player.role === 'razieh' ? -6.15 : 2), 0, player.state?.position?.z || -.35);
-      group.rotation.y = player.state?.rotation?.yaw || 0;
+      group.rotation.y = (player.state?.rotation?.yaw || 0) + Math.PI;
       runtime.worldGroup.add(group);
       remote = { group, player, characterSignature, targetPosition: group.position.clone(), targetYaw: group.rotation.y, animation: player.state?.animation || 'idle', networkAction: null };
       runtime.remotePlayers.set(id, remote);
@@ -726,7 +858,8 @@ function rebuildRemotePlayers() {
     }
     remote.player = player;
     remote.targetPosition.set(player.state?.position?.x ?? remote.targetPosition.x, 0, player.state?.position?.z ?? remote.targetPosition.z);
-    remote.targetYaw = player.state?.rotation?.yaw ?? remote.targetYaw;
+    const incomingYaw = player.state?.rotation?.yaw;
+    remote.targetYaw = (incomingYaw !== undefined && incomingYaw !== null) ? incomingYaw + Math.PI : remote.targetYaw;
     remote.animation = player.state?.animation || 'idle';
     remote.group.userData.name = player.name;
   });
@@ -823,7 +956,7 @@ function startSynchronizedInteraction(action, remoteId, event = {}) {
   const anchor = runtime.playerPos.clone().addScaledVector(dir, spacing);
   remote.group.position.lerp(anchor, .8);
   remote.group.rotation.y = Math.atan2(-dir.x, -dir.z);
-  runtime.yaw = Math.atan2(dir.x, dir.z);
+  runtime.yaw = Math.atan2(-dir.x, -dir.z);
   remote.networkAction = { action, time: runtime.localAction.time, elapsed: 0 };
   for (let i = 0; i < 5; i += 1) setTimeout(() => createHeart(), i * 125);
 }
@@ -1589,8 +1722,8 @@ function updatePlayer(dt) {
   let desired = new THREE.Vector3();
   if (hasInput) {
     raw.normalize();
-    const forward = new THREE.Vector3(Math.sin(runtime.yaw), 0, -Math.cos(runtime.yaw));
-    const right = new THREE.Vector3(Math.cos(runtime.yaw), 0, Math.sin(runtime.yaw));
+    const forward = new THREE.Vector3(-Math.sin(runtime.yaw), 0, -Math.cos(runtime.yaw));
+    const right = new THREE.Vector3(Math.cos(runtime.yaw), 0, -Math.sin(runtime.yaw));
     desired.copy(forward).multiplyScalar(-raw.z).addScaledVector(right, raw.x).normalize();
   }
   const speed = (runtime.keys.ShiftLeft || runtime.keys.ShiftRight) ? 4.3 : 2.35;
@@ -1803,7 +1936,7 @@ function updatePartnerAction(type) {
       const dir = delta.normalize();
       runtime.partner.position.copy(runtime.playerPos).addScaledVector(dir, type === 'hold' ? .9 : .72);
       runtime.partner.rotation.y = Math.atan2(-dir.x, -dir.z);
-      runtime.yaw = Math.atan2(dir.x, dir.z);
+      runtime.yaw = Math.atan2(-dir.x, -dir.z);
     }
   }
   runtime.partnerAction = { type, time: type === 'dance' ? 5 : 2.25 };
